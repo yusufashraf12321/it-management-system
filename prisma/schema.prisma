@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  fullName        String
+  jobTitle        String
+  personalEmail   String    @unique
+  contactNo       String
+  hiringDate      DateTime
+  reportingTo     String?
+  konectaMail     String    @unique
+  role            String    @default("EMPLOYEE") // ADMIN, IT_STAFF, EMPLOYEE
+  password        String
+  departmentId    Int?
+  department      Department? @relation(fields: [departmentId], references: [id])
+  
+  assignedAssets  Asset[]   @relation("AssetAssignment")
+  tickets         Ticket[]  @relation("TicketRequester")
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  users       User[]
+  assets      Asset[]  @relation("DepartmentAssets")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryItem {
+  id             Int      @id @default(autoincrement())
+  category       String   // e.g., Laptop, Monitor, Keyboard
+  brand          String
+  model          String
+  totalCount     Int      @default(0)
+  availableCount Int      @default(0)
+  assets         Asset[]
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([category, brand, model])
+}
+
+model Asset {
+  id               Int      @id @default(autoincrement())
+  serialNumber     String   @unique
+  status           String   @default("IN_STOCK") // IN_STOCK, ASSIGNED, MAINTENANCE, RETIRED
+  notes            String?
+
+  inventoryItemId  Int
+  inventoryItem    InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  assignedToUserId Int?
+  assignedToUser   User?    @relation("AssetAssignment", fields: [assignedToUserId], references: [id])
+
+  departmentId     Int?
+  department       Department? @relation("DepartmentAssets", fields: [departmentId], references: [id])
+  
+  assignedDate     DateTime?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Ticket {
+  id                   Int       @id @default(autoincrement())
+  recNumber            String    @unique // Auto-generated e.g., REC-2026-0001
+  status               String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  issueDate            DateTime  @default(now())
+  
+  requesterName        String
+  email                String
+  priority             String    @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  issueImpact          String
+  clientImpact         String?
+  clientName           String?
+  
+  troubleshootingSteps String?
+  resolution           String?
+  resolutionDate       DateTime?
+  category             String?
+  usersImpact          String?
+
+  requesterId          Int?
+  requester            User?     @relation("TicketRequester", fields: [requesterId], references: [id])
+  
+  attachments          TicketAttachment[]
+  
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model TicketAttachment {
+  id        Int      @id @default(autoincrement())
+  filename  String
+  filepath  String
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+}
