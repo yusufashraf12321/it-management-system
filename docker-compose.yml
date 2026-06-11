@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   konecta-it:
+    build: .
     image: konecta-it-system:latest
     container_name: konecta-it-system
     restart: unless-stopped
