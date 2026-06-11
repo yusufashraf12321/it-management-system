@@ -18,19 +18,29 @@ export default function Inventory() {
 
   const fetchInventory = async () => {
     try {
-      const res = await fetch('/api/inventory');
-      const data = await res.json();
+      const [inventoryRes, categoriesRes] = await Promise.all([
+        fetch('/api/inventory'),
+        fetch('/api/categories')
+      ]);
       
-      // Group by category for summary cards
-      const grouped = data.reduce((acc, item) => {
-        if (!acc[item.category]) {
-          acc[item.category] = { total: 0, available: 0, items: [] };
+      const inventoryData = await inventoryRes.json();
+      const categoriesData = await categoriesRes.json();
+      
+      // Initialize grouped object with all categories
+      const grouped = {};
+      categoriesData.forEach(cat => {
+        grouped[cat.name] = { total: 0, available: 0, items: [] };
+      });
+
+      // Group inventory items
+      inventoryData.forEach(item => {
+        if (!grouped[item.category]) {
+          grouped[item.category] = { total: 0, available: 0, items: [] };
         }
-        acc[item.category].total += item.totalCount;
-        acc[item.category].available += item.availableCount;
-        acc[item.category].items.push(item);
-        return acc;
-      }, {});
+        grouped[item.category].total += item.totalCount;
+        grouped[item.category].available += item.availableCount;
+        grouped[item.category].items.push(item);
+      });
 
       setItems(grouped);
     } catch (error) {
@@ -92,24 +102,24 @@ export default function Inventory() {
 
       <div className="grid grid-cols-3 gap-6">
         {Object.entries(items).map(([category, data]) => (
-          <Link key={category} href={`/inventory/category/${encodeURIComponent(category)}`} style={{ textDecoration: 'none' }}>
-            <div className="glass-card" style={styles.categoryCard}>
-              <div style={styles.cardHeader}>
-                <div style={styles.iconWrapper}>
-                  {getIcon(category)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <h3 className="text-xl" style={{ color: 'var(--text-primary)' }}>{category}</h3>
-                </div>
-                <button 
-                  onClick={(e) => handleDeleteCategory(e, category)}
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.5rem' }}
-                  title="Delete Category"
-                >
-                  <Trash2 size={20} />
-                </button>
+          <div key={category} className="glass-card" style={{ ...styles.categoryCard, padding: 0 }}>
+            <div style={styles.cardHeader}>
+              <div style={styles.iconWrapper}>
+                {getIcon(category)}
               </div>
-              
+              <div style={{ flex: 1 }}>
+                <h3 className="text-xl" style={{ color: 'var(--text-primary)' }}>{category}</h3>
+              </div>
+              <button 
+                onClick={(e) => handleDeleteCategory(e, category)}
+                className="icon-btn-small danger-permanent"
+                title="Delete Category"
+              >
+                <Trash2 size={20} />
+              </button>
+            </div>
+            
+            <Link href={`/inventory/category/${encodeURIComponent(category)}`} style={{ textDecoration: 'none', display: 'block', padding: '1.5rem', paddingTop: 0 }}>
               <div style={styles.statsContainer}>
                 <div style={styles.statBox}>
                   <span className="text-muted" style={{ fontSize: '0.875rem' }}>Total Stock</span>
@@ -128,7 +138,7 @@ export default function Inventory() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>{item.brand} {item.model}</span>
                       <button 
-                        onClick={(e) => { e.preventDefault(); setSelectedItemForBulk(item); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItemForBulk(item); }}
                         style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         title="Upload Serials in Bulk"
                       >
@@ -144,15 +154,15 @@ export default function Inventory() {
                   </div>
                 )}
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         ))}
 
         {Object.keys(items).length === 0 && (
           <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', gridColumn: '1 / -1' }}>
             <Package size={48} color="var(--text-muted)" style={{ margin: '0 auto 1rem auto' }} />
             <h3 className="text-xl mb-2">No Inventory Items</h3>
-            <p className="text-muted mb-4">You haven't added any inventory items yet.</p>
+            <p className="text-muted mb-4">You haven&apos;t added any inventory items yet.</p>
             <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>Add Your First Item</button>
           </div>
         )}

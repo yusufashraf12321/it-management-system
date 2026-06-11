@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import fs from 'fs';
+import path from 'path';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -15,10 +17,7 @@ export async function GET(request) {
   try {
     const tickets = await prisma.ticket.findMany({
       where,
-      include: {
-        requester: true,
-        attachments: true
-      },
+      include: { requester: true, attachments: true },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(tickets);
@@ -31,7 +30,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const data = await request.json();
-    
+
     // Generate REC NUMBER (e.g., REC-2026-0001)
     const currentYear = new Date().getFullYear();
     const count = await prisma.ticket.count({
@@ -44,6 +43,28 @@ export async function POST(request) {
     });
     const recNumber = `REC-${currentYear}-${(count + 1).toString().padStart(4, '0')}`;
 
+    let attachmentData = null;
+    if (data.attachmentBase64 && data.attachmentName) {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const sanitizedName = data.attachmentName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filename = `${Date.now()}-${sanitizedName}`;
+      const filepath = path.join(uploadDir, filename);
+
+      const base64Data = data.attachmentBase64.replace(/^data:\w+\/[a-zA-Z+\-.]+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      fs.writeFileSync(filepath, buffer);
+
+      attachmentData = {
+        filename: data.attachmentName,
+        filepath: `/uploads/${filename}`
+      };
+    }
+
     const ticket = await prisma.ticket.create({
       data: {
         recNumber,
@@ -54,8 +75,12 @@ export async function POST(request) {
         issueImpact: data.issueImpact,
         clientImpact: data.clientImpact,
         clientName: data.clientName,
-        requesterId: data.requesterId ? parseInt(data.requesterId) : null
-      }
+        requesterId: data.requesterId ? parseInt(data.requesterId) : null,
+        ...(attachmentData && {
+          attachments: { create: attachmentData }
+        })
+      },
+      include: { attachments: true }
     });
 
     return NextResponse.json(ticket);

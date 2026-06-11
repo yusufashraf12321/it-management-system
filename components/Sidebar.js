@@ -1,9 +1,10 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Monitor, Ticket, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, Monitor, Ticket, Users, LogOut, Truck, ChevronDown, ChevronRight, ArrowRight, PieChart, Activity, Wrench } from 'lucide-react';
 
-export default function Sidebar({ userRole }) {
+export default function Sidebar({ userRole, onNavigate }) {
   const pathname = usePathname();
 
   const handleLogout = async () => {
@@ -14,32 +15,74 @@ export default function Sidebar({ userRole }) {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'IT_STAFF'] },
     { name: 'Inventory', path: '/inventory', icon: Package, roles: ['ADMIN', 'IT_STAFF'] },
+    { name: 'Vendors', path: '/vendors', icon: Truck, roles: ['ADMIN', 'IT_STAFF'] },
     { name: 'Assets', path: '/assets', icon: Monitor, roles: ['ADMIN', 'IT_STAFF'] },
+    { name: 'Maintenances', path: '/maintenances', icon: Wrench, roles: ['ADMIN', 'IT_STAFF'] },
     { name: 'Tickets', path: '/tickets', icon: Ticket, roles: ['ADMIN', 'IT_STAFF'] },
+    { name: 'Logs', path: '/logs', icon: Activity, roles: ['ADMIN'] },
     { name: 'My Portal', path: '/portal', icon: Ticket, roles: ['EMPLOYEE'] },
   ];
+
+  const [vendors, setVendors] = useState([]);
+  const [showVendors, setShowVendors] = useState(false);
+
+  useEffect(() => {
+    if (userRole !== 'EMPLOYEE') {
+      fetch('/api/vendors')
+        .then(res => res.json())
+        .then(data => setVendors(Array.isArray(data) ? data : []))
+        .catch(err => console.error(err));
+    }
+  }, [userRole]);
 
   const allowedItems = navItems.filter(item => item.roles.includes(userRole));
 
   return (
-    <aside style={styles.sidebar} className="glass-panel">
-      <div style={styles.logoContainer}>
+    <aside className="sidebar glass-panel">
+      <div className="sidebar-logo-container">
         <Monitor size={32} color="var(--accent-primary)" />
-        <h2 style={styles.logoText}>IT System</h2>
+        <h2 className="sidebar-logo-text">IT System</h2>
       </div>
 
-      <nav style={styles.nav}>
+      <nav className="sidebar-nav">
         {allowedItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.path);
+          
+          if (item.name === 'Vendors') {
+            return (
+              <div key={item.path}>
+                <div 
+                  onClick={() => setShowVendors(!showVendors)}
+                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Icon size={20} />
+                  <span style={{ flex: 1 }}>{item.name}</span>
+                  {showVendors ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </div>
+                {showVendors && (
+                  <div className="sidebar-dropdown">
+                    <Link href="/vendors" className="sidebar-dropdown-item" onClick={onNavigate}>
+                      <LayoutDashboard size={14} /> Overview
+                    </Link>
+                    {vendors.map(v => (
+                      <Link key={v.id} href={`/vendors/${v.id}`} className="sidebar-dropdown-item" onClick={onNavigate}>
+                        <ArrowRight size={14} /> {v.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link 
               key={item.path} 
               href={item.path}
-              style={{
-                ...styles.navItem,
-                ...(isActive ? styles.navItemActive : {})
-              }}
+              onClick={onNavigate}
+              className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
             >
               <Icon size={20} />
               <span>{item.name}</span>
@@ -48,8 +91,8 @@ export default function Sidebar({ userRole }) {
         })}
       </nav>
 
-      <div style={styles.footer}>
-        <button onClick={handleLogout} style={styles.logoutBtn}>
+      <div className="sidebar-footer">
+        <button onClick={handleLogout} className="sidebar-logout-btn">
           <LogOut size={20} />
           <span>Logout</span>
         </button>
@@ -57,75 +100,3 @@ export default function Sidebar({ userRole }) {
     </aside>
   );
 }
-
-const styles = {
-  sidebar: {
-    width: '260px',
-    height: '100vh',
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '1.5rem',
-    borderRight: '1px solid var(--border-color)',
-    borderRadius: 0,
-    zIndex: 50,
-  },
-  logoContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    marginBottom: '3rem',
-  },
-  logoText: {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    background: 'linear-gradient(to right, var(--text-primary), var(--accent-primary))',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-    flex: 1,
-  },
-  navItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    padding: '0.875rem 1rem',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-secondary)',
-    textDecoration: 'none',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-  },
-  navItemActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    color: 'var(--accent-primary)',
-    boxShadow: 'inset 4px 0 0 var(--accent-primary)',
-  },
-  footer: {
-    marginTop: 'auto',
-    paddingTop: '1rem',
-    borderTop: '1px solid var(--border-color)',
-  },
-  logoutBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    width: '100%',
-    padding: '0.875rem 1rem',
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '1rem',
-    fontFamily: 'inherit',
-  }
-};

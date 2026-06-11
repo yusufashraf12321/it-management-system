@@ -1,139 +1,149 @@
 'use client';
-import { Bell, Search, User } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { Bell, Search, User, Menu, X, Check, AlertCircle, Info } from 'lucide-react';
+import UserProfileMenu from '@/components/UserProfileMenu';
 
-export default function Header({ title, userFullName, userRole }) {
+export default function Header({ title, userFullName, userRole, onMenuClick, showMenuBtn }) {
+  const [notifications, setNotifications] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showNotif, setShowNotif] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
+  const audioRef = useRef(null);
+
+  const fetchUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      if (data.id) setCurrentUser(data);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchNotifs = async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const unread = data.filter(n => !n.isRead);
+        if (unread.length > (notifications.filter(n => !n.isRead).length)) {
+          if (audioRef.current) audioRef.current.play().catch(e => console.log('Audio play blocked'));
+          setHasNew(true);
+        }
+        setNotifications(data);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    fetchUser();
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const markRead = async () => {
+    setShowNotif(!showNotif);
+    if (!showNotif && notifications.some(n => !n.isRead)) {
+      await fetch('/api/notifications', { method: 'PATCH' });
+      setHasNew(false);
+      fetchNotifs();
+    }
+  };
+
   return (
-    <header style={styles.header} className="glass-panel">
-      <div style={styles.titleContainer}>
-        <h1 style={styles.title}>{title}</h1>
+    <header className="header-container glass-panel">
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/1110/1110-preview.mp3" preload="auto" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+        {showMenuBtn && (
+          <button onClick={onMenuClick} className="mobile-menu-btn" style={{ display: 'flex' }}>
+            <Menu size={22} />
+          </button>
+        )}
+        <h1 className="header-title">{title}</h1>
       </div>
 
-      <div style={styles.actions}>
-        <div style={styles.searchContainer}>
-          <Search size={18} style={styles.searchIcon} />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            style={styles.searchInput}
-          />
+      <div className="header-actions">
+        <div className="header-search-container search-hide-mobile">
+          <Search size={18} className="header-search-icon" />
+          <input type="text" placeholder="Search..." className="header-search-input" />
         </div>
 
-        <button style={styles.iconBtn}>
-          <Bell size={20} />
-          <span style={styles.badge}></span>
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button onClick={markRead} className="header-icon-btn">
+            <Bell size={20} />
+            {notifications.some(n => !n.isRead) && <span className="header-notif-badge"></span>}
+          </button>
 
-        <div style={styles.profile}>
-          <div style={styles.avatar}>
-            <User size={20} />
-          </div>
-          <div style={styles.userInfo}>
-            <span style={styles.userName}>{userFullName}</span>
-            <span style={styles.userRole}>{userRole}</span>
-          </div>
+          {showNotif && (
+            <div className="glass-panel header-notif-dropdown">
+              <div style={styles.notifHeader}>
+                <span style={{ fontWeight: 600 }}>Notifications</span>
+                <span className="text-xs text-muted">{notifications.filter(n => !n.isRead).length} Unread</span>
+              </div>
+              <div style={styles.notifList}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No notifications
+                  </div>
+                ) : notifications.map(n => (
+                  <div key={n.id} style={{
+                    ...styles.notifItem,
+                    borderLeft: `3px solid ${n.type === 'SUCCESS' ? 'var(--success)' : 'var(--accent-primary)'}`
+                  }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{n.title}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{n.message}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <button 
+            onClick={() => setShowProfile(!showProfile)} 
+            className="header-profile-btn"
+          >
+            <div className="header-avatar">
+              <User size={20} />
+            </div>
+            <div className="header-user-info user-info-hide-mobile">
+              <span className="header-user-name">{userFullName}</span>
+              <span className="header-user-role">{userRole}</span>
+            </div>
+          </button>
+
+          {showProfile && currentUser && (
+            <UserProfileMenu 
+              user={currentUser} 
+              onClose={() => setShowProfile(false)} 
+            />
+          )}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .search-hide-mobile { display: none !important; }
+          .user-info-hide-mobile { display: none !important; }
+        }
+      `}</style>
     </header>
   );
 }
 
 const styles = {
-  header: {
-    height: '80px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 2rem',
-    borderBottom: '1px solid var(--border-color)',
-    borderRadius: 0,
-    borderLeft: 'none',
-    borderRight: 'none',
-    borderTop: 'none',
-    position: 'sticky',
-    top: 0,
-    zIndex: 40,
+  notifHeader: {
+    padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)',
+    background: 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   },
-  titleContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: '600',
-    color: 'var(--text-primary)',
-  },
-  actions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1.5rem',
-  },
-  searchContainer: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: '1rem',
-    color: 'var(--text-muted)',
-  },
-  searchInput: {
-    paddingLeft: '2.5rem',
-    width: '250px',
-    background: 'rgba(15, 23, 42, 0.4)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-xl)',
-    color: 'var(--text-primary)',
-  },
-  iconBtn: {
-    background: 'rgba(15, 23, 42, 0.4)',
-    border: '1px solid var(--border-color)',
-    color: 'var(--text-secondary)',
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    position: 'relative',
-    transition: 'all 0.2s',
-  },
-  badge: {
-    position: 'absolute',
-    top: '8px',
-    right: '10px',
-    width: '8px',
-    height: '8px',
-    backgroundColor: 'var(--danger)',
-    borderRadius: '50%',
-  },
-  profile: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    paddingLeft: '1.5rem',
-    borderLeft: '1px solid var(--border-color)',
-  },
-  avatar: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, var(--accent-primary), var(--secondary))',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-  },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  userName: {
-    fontWeight: '600',
-    fontSize: '0.875rem',
-  },
-  userRole: {
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
+  notifList: { overflowY: 'auto' },
+  notifItem: {
+    padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)',
+    transition: 'background 0.2s', cursor: 'default',
   }
 };

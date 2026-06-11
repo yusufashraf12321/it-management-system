@@ -5,10 +5,12 @@ export function middleware(request) {
   const { pathname } = request.nextUrl;
 
   // Public paths
-  if (pathname === '/login' || pathname.startsWith('/api/auth/')) {
-    if (token && pathname === '/login') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/vendor-portal/') ||
+    pathname.startsWith('/api/vendor-portal/')
+  ) {
     return NextResponse.next();
   }
 

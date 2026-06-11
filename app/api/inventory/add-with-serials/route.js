@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { category, brand, model, serialNumbers } = data;
+    const { category, brand, model, serialNumbers, status = 'IN_STOCK', vendorName = 'Internal' } = data;
 
     if (!category || !brand || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -28,26 +28,36 @@ export async function POST(request) {
         });
       }
 
-      // 2. Add Assets if serials provided
+      // 2. Add Assets
       if (serialNumbers && serialNumbers.length > 0) {
-        await Promise.all(
-          serialNumbers.map(serial => 
-            tx.asset.create({
-              data: {
-                serialNumber: serial,
-                inventoryItemId: inventoryItem.id,
-                status: 'IN_STOCK'
-              }
-            })
-          )
-        );
+        for (const serial of serialNumbers) {
+          const asset = await tx.asset.create({
+            data: {
+              serialNumber: serial,
+              inventoryItemId: inventoryItem.id,
+              status: status // Can be IN_STOCK or MAINTENANCE
+            }
+          });
 
-        // 3. Update Counts
+          // 3. If Maintenance, create record
+          if (status === 'MAINTENANCE') {
+            await tx.maintenance.create({
+              data: {
+                assetId: asset.id,
+                serialNumber: serial,
+                vendorName: vendorName,
+                status: 'OUT_FOR_REPAIR'
+              }
+            });
+          }
+        }
+
+        // 4. Update InventoryItem Counts
         await tx.inventoryItem.update({
           where: { id: inventoryItem.id },
           data: {
             totalCount: { increment: serialNumbers.length },
-            availableCount: { increment: serialNumbers.length }
+            availableCount: status === 'IN_STOCK' ? { increment: serialNumbers.length } : undefined
           }
         });
       }

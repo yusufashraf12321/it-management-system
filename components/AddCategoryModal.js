@@ -7,9 +7,7 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    category: '',
-    brand: '',
-    model: ''
+    name: ''
   });
 
   const handleSave = async (e) => {
@@ -18,7 +16,7 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
     setError('');
     
     try {
-      const res = await fetch('/api/inventory', {
+      const res = await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -29,7 +27,7 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
         onClose();
       } else {
         const data = await res.json();
-        setError(data.error || 'Failed to add item');
+        setError(data.error || 'Failed to add category');
       }
     } catch (error) {
       setError('An unexpected error occurred');
@@ -40,7 +38,7 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
 
   return (
     <div className="modal-overlay animate-fade-in">
-      <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+      <div className="modal-container">
         <div style={styles.header}>
           <h2 className="text-xl">Create New Category</h2>
           <button onClick={onClose} className="icon-btn-small">
@@ -48,46 +46,30 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', padding: '2rem' }}>
-          {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
 
-          <div className="form-group">
-            <label>Category Name</label>
-            <input 
-              type="text" 
-              value={formData.category}
-              onChange={(e) => setFormData({...formData, category: e.target.value})}
-              placeholder="e.g. Laptop, Monitor..."
-              required 
-            />
+            <div className="form-group">
+              <label>Category Name</label>
+              <input 
+                type="text" 
+                value={formData.name}
+                onChange={(e) => setFormData({ name: e.target.value })}
+                placeholder="e.g. LAPTOPS, MONITORS..."
+                required 
+                autoFocus
+              />
+            </div>
+            <p className="text-muted text-sm mt-4">
+              After creating the category, you can add specific brands and models from the category detail page.
+            </p>
           </div>
 
-          <div className="form-group">
-            <label>First Brand</label>
-            <input 
-              type="text" 
-              value={formData.brand}
-              onChange={(e) => setFormData({...formData, brand: e.target.value})}
-              placeholder="e.g. Dell, HP..."
-              required 
-            />
-          </div>
-
-          <div className="form-group mb-6">
-            <label>First Model</label>
-            <input 
-              type="text" 
-              value={formData.model}
-              onChange={(e) => setFormData({...formData, model: e.target.value})}
-              placeholder="e.g. Latitude 5540..."
-              required 
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 mt-auto">
+          <div className="modal-footer">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Initialize Category</>}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Create Category</>}
             </button>
           </div>
         </form>

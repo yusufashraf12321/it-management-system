@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Clock, User, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Save, Loader2 } from 'lucide-react';
 
 export default function TicketEditModal({ ticket, onClose, onUpdate }) {
   const [loading, setLoading] = useState(false);
@@ -42,8 +42,8 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
   };
 
   return (
-    <div style={styles.overlay}>
-      <div className="glass-card" style={styles.modal}>
+    <div className="modal-overlay animate-fade-in">
+      <div className="modal-container" style={{ maxWidth: '800px' }}>
         <div style={styles.header}>
           <div className="flex items-center gap-4">
             <h2 className="text-xl">{ticket.recNumber}</h2>
@@ -51,13 +51,13 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
               {formData.status}
             </span>
           </div>
-          <button onClick={onClose} style={styles.closeBtn}>
+          <button onClick={onClose} className="icon-btn-small">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div style={styles.content}>
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
             
             {/* Requester Info Readonly */}
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -81,24 +81,14 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
                 <p className="text-muted" style={{ fontSize: '0.875rem' }}>Issue Impact (From User)</p>
                 <div style={styles.readOnlyText}>{ticket.issueImpact}</div>
               </div>
-              
-              {ticket.clientImpact && (
-                <div className="mt-4">
-                  <p className="text-muted" style={{ fontSize: '0.875rem' }}>Client Impact</p>
-                  <div style={styles.readOnlyText}>
-                    <span className="badge badge-danger mr-2">YES</span>
-                    {ticket.clientName} - {ticket.clientImpact}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* IT Team Section */}
             <div>
-              <h3 style={styles.sectionTitle}>__To be filled by IT Team__</h3>
+              <h3 style={styles.sectionTitle}>IT Team Updates</h3>
               
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="form-group mb-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
                   <label>Status</label>
                   <select name="status" value={formData.status} onChange={handleChange}>
                     <option value="OPEN">Open</option>
@@ -107,7 +97,7 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
                     <option value="CLOSED">Closed</option>
                   </select>
                 </div>
-                <div className="form-group mb-0">
+                <div className="form-group">
                   <label>Priority</label>
                   <select name="priority" value={formData.priority} onChange={handleChange}>
                     <option value="LOW">Low</option>
@@ -118,8 +108,8 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="form-group mb-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="form-group">
                   <label>Category</label>
                   <select name="category" value={formData.category} onChange={handleChange}>
                     <option value="">Select Category...</option>
@@ -130,7 +120,7 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
                     <option value="OTHER">Other</option>
                   </select>
                 </div>
-                <div className="form-group mb-0">
+                <div className="form-group">
                   <label>Users Impact</label>
                   <select name="usersImpact" value={formData.usersImpact} onChange={handleChange}>
                     <option value="">Select Impact Scope...</option>
@@ -144,33 +134,18 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
 
               <div className="form-group">
                 <label>Troubleshooting Steps</label>
-                <textarea 
-                  name="troubleshootingSteps" 
-                  value={formData.troubleshootingSteps} 
-                  onChange={handleChange}
-                  rows={3}
-                  placeholder="What steps were taken to diagnose?"
-                />
+                <textarea name="troubleshootingSteps" value={formData.troubleshootingSteps} onChange={handleChange} rows={3} placeholder="Steps taken?" />
               </div>
 
-              <div className="form-group mb-0">
+              <div className="form-group">
                 <label>Resolution</label>
-                <textarea 
-                  name="resolution" 
-                  value={formData.resolution} 
-                  onChange={handleChange}
-                  rows={3}
-                  placeholder="How was the issue resolved?"
-                />
+                <textarea name="resolution" value={formData.resolution} onChange={handleChange} rows={3} placeholder="How was it fixed?" />
               </div>
-
             </div>
           </div>
 
-          <div style={styles.footer}>
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
-            </button>
+          <div className="modal-footer">
+            <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Ticket</>}
             </button>
@@ -182,75 +157,14 @@ export default function TicketEditModal({ ticket, onClose, onUpdate }) {
 }
 
 const styles = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    backdropFilter: 'blur(4px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    padding: '2rem',
-  },
-  modal: {
-    width: '100%',
-    maxWidth: '800px',
-    height: '90vh',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: 0,
-    overflow: 'hidden',
-  },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '1.5rem 2rem',
-    borderBottom: '1px solid var(--border-color)',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)',
     background: 'rgba(15, 23, 42, 0.4)',
   },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    padding: '0.25rem',
-    borderRadius: 'var(--radius-sm)',
-    transition: 'all 0.2s',
-  },
-  content: {
-    padding: '2rem',
-    overflowY: 'auto',
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: '1.125rem',
-    fontWeight: 600,
-    marginBottom: '1rem',
-    color: 'var(--accent-primary)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
+  sectionTitle: { fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--accent-primary)' },
   readOnlyText: {
-    background: 'rgba(15, 23, 42, 0.4)',
-    padding: '1rem',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--border-color)',
-    fontSize: '0.875rem',
-    color: 'var(--text-primary)',
-    lineHeight: 1.5,
-  },
-  footer: {
-    padding: '1.5rem 2rem',
-    borderTop: '1px solid var(--border-color)',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '1rem',
-    background: 'rgba(15, 23, 42, 0.4)',
+    background: 'rgba(15, 23, 42, 0.4)', padding: '1rem', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--border-color)', fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: 1.5,
   }
 };

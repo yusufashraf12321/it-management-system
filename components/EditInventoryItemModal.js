@@ -39,7 +39,7 @@ export default function EditInventoryItemModal({ item, onClose, onUpdate }) {
 
   return (
     <div className="modal-overlay animate-fade-in">
-      <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+      <div className="modal-container">
         <div style={styles.header}>
           <h2 className="text-xl">Edit Model Details</h2>
           <button onClick={onClose} className="icon-btn-small">
@@ -47,30 +47,32 @@ export default function EditInventoryItemModal({ item, onClose, onUpdate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', padding: '2rem' }}>
-          {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
 
-          <div className="form-group">
-            <label>Brand</label>
-            <input 
-              type="text" 
-              value={formData.brand}
-              onChange={(e) => setFormData({...formData, brand: e.target.value})}
-              required 
-            />
+            <div className="form-group">
+              <label>Brand</label>
+              <input 
+                type="text" 
+                value={formData.brand}
+                onChange={(e) => setFormData({...formData, brand: e.target.value})}
+                required 
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Model Name</label>
+              <input 
+                type="text" 
+                value={formData.model}
+                onChange={(e) => setFormData({...formData, model: e.target.value})}
+                required 
+              />
+            </div>
           </div>
 
-          <div className="form-group mb-6">
-            <label>Model Name</label>
-            <input 
-              type="text" 
-              value={formData.model}
-              onChange={(e) => setFormData({...formData, model: e.target.value})}
-              required 
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 mt-auto">
+          <div className="modal-footer">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Changes</>}

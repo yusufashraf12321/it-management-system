@@ -26,6 +26,11 @@ export async function DELETE(request, { params }) {
           where: { id: { in: itemIds } }
         });
       }
+
+      // 4. Delete the category itself from Category table
+      await tx.category.delete({
+        where: { name: categoryName }
+      });
     });
 
     return NextResponse.json({ success: true });

@@ -4,160 +4,103 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Start seeding...');
+  console.log('🌱 Starting Production Database Initialization...');
 
-  // Create Departments
+  const adminPass = await bcrypt.hash('ahmed', 10);
+
+  // 1. Create Default Department
+  console.log('🏢 Creating Default IT Department...');
   const deptIT = await prisma.department.upsert({
-    where: { name: 'Information Technology' },
+    where: { name: 'IT Operations' },
     update: {},
-    create: { name: 'Information Technology', description: 'IT Support and Infrastructure' },
+    create: { name: 'IT Operations', description: 'Central IT Management' }
   });
 
-  const deptHR = await prisma.department.upsert({
-    where: { name: 'Human Resources' },
-    update: {},
-    create: { name: 'Human Resources', description: 'HR and Recruitment' },
-  });
-
-  const deptFinance = await prisma.department.upsert({
-    where: { name: 'Finance' },
-    update: {},
-    create: { name: 'Finance', description: 'Accounting and Finance' },
-  });
-
-  // Create Users
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.upsert({
-    where: { personalEmail: 'admin@company.com' },
-    update: {},
+  // 2. Create Default Admin User
+  console.log('👑 Creating Master Admin Account...');
+  await prisma.user.upsert({
+    where: { personalEmail: 'ahmed.konecta@konecta.com' },
+    update: { password: adminPass },
     create: {
-      fullName: 'System Admin',
-      jobTitle: 'IT Manager',
-      personalEmail: 'admin@company.com',
-      contactNo: '01000000000',
-      hiringDate: new Date('2020-01-01'),
-      konectaMail: 'admin.konecta@company.com',
+      fullName: 'System Administrator',
+      jobTitle: 'IT Director',
+      personalEmail: 'ahmed.konecta@konecta.com',
+      contactNo: '+20000000000',
+      hiringDate: new Date(),
+      konectaMail: 'ahmed.konecta@konecta.com',
+      password: adminPass,
       role: 'ADMIN',
-      password: adminPassword,
+      departmentId: deptIT.id
+    },
+  });
+
+  const empPass = await bcrypt.hash('employee', 10);
+
+  console.log('👤 Creating Employee Account...');
+  await prisma.user.upsert({
+    where: { personalEmail: 'employee@konecta.com' },
+    update: { password: empPass },
+    create: {
+      fullName: 'Yousef Employee',
+      jobTitle: 'Staff',
+      personalEmail: 'employee@konecta.com',
+      contactNo: '+20000000001',
+      hiringDate: new Date(),
+      konectaMail: 'employee@konecta.com',
+      password: empPass,
+      role: 'EMPLOYEE',
+      departmentId: deptIT.id
+    },
+  });
+
+  const employeeUser = await prisma.user.findUnique({ where: { personalEmail: 'employee@konecta.com' } });
+
+  console.log('📦 Creating Basic Inventory and Assets for Employee...');
+  const catLaptops = await prisma.category.upsert({ where: { name: 'LAPTOPS' }, update: {}, create: { name: 'LAPTOPS' } });
+  
+  const invMacBook = await prisma.inventoryItem.upsert({
+    where: { category_brand_model: { category: 'LAPTOPS', brand: 'Apple', model: 'MacBook Air M2' } },
+    update: {},
+    create: { category: 'LAPTOPS', brand: 'Apple', model: 'MacBook Air M2', totalCount: 1, availableCount: 0 }
+  });
+
+  await prisma.asset.upsert({
+    where: { serialNumber: 'MAC-AIR-001' },
+    update: {},
+    create: {
+      serialNumber: 'MAC-AIR-001',
+      price: 1200.00,
+      status: 'IN_USE',
+      inventoryItemId: invMacBook.id,
+      assignedToUserId: employeeUser.id,
       departmentId: deptIT.id,
-    },
+      assignedDate: new Date()
+    }
   });
 
-  const employeePassword = await bcrypt.hash('emp123', 10);
-  const emp1 = await prisma.user.upsert({
-    where: { personalEmail: 'ahmed.m@company.com' },
+  console.log('🎫 Creating Basic Ticket for Employee...');
+  await prisma.ticket.upsert({
+    where: { recNumber: 'REC-0001' },
     update: {},
     create: {
-      fullName: 'Ahmed Mahmoud',
-      jobTitle: 'HR Specialist',
-      personalEmail: 'ahmed.m@company.com',
-      contactNo: '01111111111',
-      hiringDate: new Date('2022-03-15'),
-      reportingTo: 'HR Manager',
-      konectaMail: 'ahmed.konecta@company.com',
-      role: 'EMPLOYEE',
-      password: employeePassword,
-      departmentId: deptHR.id,
-    },
+      recNumber: 'REC-0001',
+      status: 'OPEN',
+      requesterName: employeeUser.fullName,
+      email: employeeUser.personalEmail,
+      priority: 'MEDIUM',
+      issueImpact: 'Need a software license for Photoshop.',
+      requesterId: employeeUser.id
+    }
   });
 
-  const emp2 = await prisma.user.upsert({
-    where: { personalEmail: 'sara.k@company.com' },
-    update: {},
-    create: {
-      fullName: 'Sara Khaled',
-      jobTitle: 'Financial Analyst',
-      personalEmail: 'sara.k@company.com',
-      contactNo: '01222222222',
-      hiringDate: new Date('2023-06-01'),
-      reportingTo: 'CFO',
-      konectaMail: 'sara.konecta@company.com',
-      role: 'EMPLOYEE',
-      password: employeePassword,
-      departmentId: deptFinance.id,
-    },
-  });
 
-  // Create Inventory Items
-  const laptopModelX = await prisma.inventoryItem.upsert({
-    where: {
-      category_brand_model: {
-        category: 'Laptop',
-        brand: 'Dell',
-        model: 'Latitude 5540'
-      }
-    },
-    update: {},
-    create: {
-      category: 'Laptop',
-      brand: 'Dell',
-      model: 'Latitude 5540',
-      totalCount: 50,
-      availableCount: 49,
-    },
-  });
+  console.log('✅ Database Initialization Complete (Clean State)!');
+  console.log('--------------------------------------------------');
+  console.log('🔑 ACCOUNTS:');
+  console.log('Admin:    ahmed.konecta@konecta.com  | Pass: ahmed');
+  console.log('Employee: employee@konecta.com       | Pass: employee');
+  console.log('--------------------------------------------------');
 
-  const laptopModelZ = await prisma.inventoryItem.upsert({
-    where: {
-      category_brand_model: {
-        category: 'Laptop',
-        brand: 'HP',
-        model: 'ProBook 450'
-      }
-    },
-    update: {},
-    create: {
-      category: 'Laptop',
-      brand: 'HP',
-      model: 'ProBook 450',
-      totalCount: 50,
-      availableCount: 50,
-    },
-  });
-
-  // Create Assets
-  const asset1 = await prisma.asset.upsert({
-    where: { serialNumber: 'SN-DELL-001' },
-    update: {},
-    create: {
-      serialNumber: 'SN-DELL-001',
-      status: 'ASSIGNED',
-      inventoryItemId: laptopModelX.id,
-      assignedToUserId: emp1.id,
-      departmentId: deptHR.id,
-      assignedDate: new Date(),
-    },
-  });
-
-  // Add remaining 49 available assets for Dell
-  for (let i = 2; i <= 50; i++) {
-    const sn = `SN-DELL-${i.toString().padStart(3, '0')}`;
-    await prisma.asset.upsert({
-      where: { serialNumber: sn },
-      update: {},
-      create: {
-        serialNumber: sn,
-        status: 'IN_STOCK',
-        inventoryItemId: laptopModelX.id,
-      },
-    });
-  }
-
-  // Add 50 available assets for HP
-  for (let i = 1; i <= 50; i++) {
-    const sn = `SN-HP-${i.toString().padStart(3, '0')}`;
-    await prisma.asset.upsert({
-      where: { serialNumber: sn },
-      update: {},
-      create: {
-        serialNumber: sn,
-        status: 'IN_STOCK',
-        inventoryItemId: laptopModelZ.id,
-      },
-    });
-  }
-
-  console.log('Seeding finished.');
 }
 
 main()

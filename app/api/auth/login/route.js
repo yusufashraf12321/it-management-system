@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { signToken } from '@/lib/auth';
+import { logAction } from '@/lib/logger';
 
 export async function POST(request) {
   try {
@@ -49,6 +50,8 @@ export async function POST(request) {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 // 1 day
     });
+
+    await logAction('USER_LOGIN', `User ${user.fullName} logged in`, user.personalEmail);
 
     return response;
   } catch (error) {

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { User, Monitor, Mail, Phone, Calendar, ArrowLeft, Loader2, Search, Plus } from 'lucide-react';
+import { User, Monitor, Mail, Phone, Calendar, ArrowLeft, Loader2, Search, Plus, Edit2, Trash2 } from 'lucide-react';
 import EmployeeProfileModal from '@/components/EmployeeProfileModal';
 import AddEmployeeModal from '@/components/AddEmployeeModal';
+import EditEmployeeModal from '@/components/EditEmployeeModal';
 
 export default function DepartmentAssets() {
   const params = useParams();
@@ -15,6 +16,7 @@ export default function DepartmentAssets() {
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
 
   useEffect(() => {
     fetchDepartmentData();
@@ -51,6 +53,32 @@ export default function DepartmentAssets() {
       setSelectedUser(userData);
     } catch (error) {
       console.error('Error fetching user details:', error);
+    }
+  };
+
+  const handleEditEmployee = (e, user) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingEmployee(user);
+  };
+
+  const handleDeleteEmployee = async (e, userId, fullName) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm(`Are you sure you want to delete employee "${fullName}"? Their assigned assets will be returned to stock.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchDepartmentData();
+      } else {
+        alert('Failed to delete employee');
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
     }
   };
 
@@ -111,6 +139,10 @@ export default function DepartmentAssets() {
           >
             <div style={styles.avatar}>
               <User size={32} />
+              <div style={styles.cardActions}>
+                <button onClick={(e) => handleEditEmployee(e, user)} className="icon-btn-small" title="Edit Employee"><Edit2 size={14} /></button>
+                <button onClick={(e) => handleDeleteEmployee(e, user.id, user.fullName)} className="icon-btn-small danger" title="Delete Employee"><Trash2 size={14} /></button>
+              </div>
             </div>
             <h3 style={styles.userName}>{user.fullName}</h3>
             <p style={styles.userTitle}>{user.jobTitle}</p>
@@ -144,6 +176,14 @@ export default function DepartmentAssets() {
           onUpdate={fetchDepartmentData} 
         />
       )}
+
+      {editingEmployee && (
+        <EditEmployeeModal 
+          user={editingEmployee}
+          onClose={() => setEditingEmployee(null)} 
+          onUpdate={fetchDepartmentData} 
+        />
+      )}
     </div>
   );
 }
@@ -168,6 +208,16 @@ const styles = {
     color: 'var(--text-primary)',
     marginBottom: '1rem',
     border: '2px solid rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+  },
+  cardActions: {
+    position: 'absolute',
+    top: '-5px',
+    right: '-45px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px',
+    opacity: 0.8,
   },
   userName: {
     fontSize: '1.125rem',

@@ -13,7 +13,9 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
     brand: '',
     model: '',
     serialNumber: '',
-    bulkSerials: ''
+    bulkSerials: '',
+    status: 'IN_STOCK',
+    vendorName: ''
   });
 
   const handleChange = (e) => {
@@ -39,7 +41,9 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
           category,
           brand: formData.brand,
           model: formData.model,
-          serialNumbers: serials
+          serialNumbers: serials,
+          status: formData.status,
+          vendorName: formData.vendorName
         })
       });
       
@@ -64,7 +68,7 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
 
   return (
     <div className="modal-overlay animate-fade-in">
-      <div className="glass-card" style={styles.modal}>
+      <div className="modal-container" style={{ maxWidth: '600px' }}>
         <div style={styles.header}>
           <div>
             <h2 className="text-xl">Add New Model</h2>
@@ -75,68 +79,98 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', padding: '2rem' }}>
-          {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
-          {success && <div className="badge badge-success mb-4" style={{ display: 'block', textAlign: 'center' }}>{success}</div>}
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
+            {success && <div className="badge badge-success mb-4" style={{ display: 'block', textAlign: 'center' }}>{success}</div>}
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="form-group">
+                <label>Brand</label>
+                <input type="text" name="brand" value={formData.brand} onChange={handleChange} placeholder="e.g. Dell" required />
+              </div>
+              <div className="form-group">
+                <label>Model</label>
+                <input type="text" name="model" value={formData.model} onChange={handleChange} placeholder="e.g. Latitude 5540" required />
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="mb-2 block">Entry Mode</label>
+              <div className="flex gap-4">
+                <button 
+                  type="button" 
+                  className={`btn ${addMode === 'single' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAddMode('single')}
+                  style={{ flex: 1, height: '45px' }}
+                >
+                  <List size={18} /> Single
+                </button>
+                <button 
+                  type="button" 
+                  className={`btn ${addMode === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAddMode('bulk')}
+                  style={{ flex: 1, height: '45px' }}
+                >
+                  <FileText size={18} /> Bulk
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="form-group">
+                <label>Device Status</label>
+                <select 
+                  name="status" 
+                  value={formData.status} 
+                  onChange={handleChange}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:border-accent-primary outline-none transition-all"
+                >
+                  <option value="IN_STOCK">In Stock</option>
+                  <option value="MAINTENANCE">Maintenance (External Repair)</option>
+                </select>
+              </div>
+              {formData.status === 'MAINTENANCE' && (
+                <div className="form-group animate-fade-in">
+                  <label>Service Vendor</label>
+                  <input 
+                    type="text" 
+                    name="vendorName" 
+                    value={formData.vendorName} 
+                    onChange={handleChange} 
+                    placeholder="e.g. Service Center" 
+                    required 
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="form-group">
-              <label>Brand</label>
-              <input type="text" name="brand" value={formData.brand} onChange={handleChange} placeholder="e.g. Dell" required />
-            </div>
-            <div className="form-group">
-              <label>Model</label>
-              <input type="text" name="model" value={formData.model} onChange={handleChange} placeholder="e.g. Latitude 5540" required />
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <label className="mb-2 block">Entry Mode</label>
-            <div className="flex gap-4">
-              <button 
-                type="button" 
-                className={`btn ${addMode === 'single' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setAddMode('single')}
-                style={{ flex: 1, height: '45px' }}
-              >
-                <List size={18} /> Single
-              </button>
-              <button 
-                type="button" 
-                className={`btn ${addMode === 'bulk' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setAddMode('bulk')}
-                style={{ flex: 1, height: '45px' }}
-              >
-                <FileText size={18} /> Bulk
-              </button>
+              <label>{addMode === 'single' ? 'Serial Number' : 'List of Serial Numbers'}</label>
+              {addMode === 'single' ? (
+                <input 
+                  type="text" 
+                  name="serialNumber" 
+                  value={formData.serialNumber} 
+                  onChange={handleChange} 
+                  placeholder="Enter Serial Number" 
+                  required={addMode === 'single'} 
+                />
+              ) : (
+                <textarea 
+                  name="bulkSerials" 
+                  value={formData.bulkSerials} 
+                  onChange={handleChange} 
+                  placeholder="Paste serials here (one per line)..." 
+                  rows={5}
+                  required={addMode === 'bulk'}
+                  style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
+                />
+              )}
             </div>
           </div>
 
-          <div className="form-group mb-6">
-            <label>{addMode === 'single' ? 'Serial Number' : 'List of Serial Numbers'}</label>
-            {addMode === 'single' ? (
-              <input 
-                type="text" 
-                name="serialNumber" 
-                value={formData.serialNumber} 
-                onChange={handleChange} 
-                placeholder="Enter Serial Number" 
-                required={addMode === 'single'} 
-              />
-            ) : (
-              <textarea 
-                name="bulkSerials" 
-                value={formData.bulkSerials} 
-                onChange={handleChange} 
-                placeholder="Paste serials here (one per line)..." 
-                rows={5}
-                required={addMode === 'bulk'}
-                style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-end gap-4 mt-auto">
+          <div className="modal-footer">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save to Stock</>}
@@ -149,7 +183,6 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
 }
 
 const styles = {
-  modal: { width: '100%', maxWidth: '600px', padding: 0, overflow: 'hidden' },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)',

@@ -40,7 +40,7 @@ export default function EditAssetModal({ asset, onClose, onUpdate }) {
 
   return (
     <div className="modal-overlay animate-fade-in">
-      <div className="glass-card" style={{ width: '100%', maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+      <div className="modal-container">
         <div style={styles.header}>
           <h2 className="text-xl">Edit Serial Number</h2>
           <button onClick={onClose} className="icon-btn-small">
@@ -48,45 +48,47 @@ export default function EditAssetModal({ asset, onClose, onUpdate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', padding: '2rem' }}>
-          {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {error && <div className="badge badge-danger mb-4" style={{ display: 'block', textAlign: 'center' }}>{error}</div>}
 
-          <div className="form-group">
-            <label>Serial Number</label>
-            <input 
-              type="text" 
-              value={formData.serialNumber}
-              onChange={(e) => setFormData({...formData, serialNumber: e.target.value})}
-              required 
-            />
+            <div className="form-group">
+              <label>Serial Number</label>
+              <input 
+                type="text" 
+                value={formData.serialNumber}
+                onChange={(e) => setFormData({...formData, serialNumber: e.target.value})}
+                required 
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Device Status</label>
+              <select 
+                value={formData.status} 
+                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                disabled={asset.status === 'ASSIGNED'}
+              >
+                <option value="IN_STOCK">In Stock</option>
+                <option value="MAINTENANCE">Maintenance</option>
+                <option value="RETIRED">Retired</option>
+                {asset.status === 'ASSIGNED' && <option value="ASSIGNED">Assigned (ReadOnly)</option>}
+              </select>
+              {asset.status === 'ASSIGNED' && <p className="text-muted text-xs mt-1">Cannot change status while assigned.</p>}
+            </div>
+
+            <div className="form-group">
+              <label>Notes / Condition</label>
+              <textarea 
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                rows={3}
+                placeholder="Add details about the device condition..."
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>Device Status</label>
-            <select 
-              value={formData.status} 
-              onChange={(e) => setFormData({...formData, status: e.target.value})}
-              disabled={asset.status === 'ASSIGNED'}
-            >
-              <option value="IN_STOCK">In Stock</option>
-              <option value="MAINTENANCE">Maintenance</option>
-              <option value="RETIRED">Retired</option>
-              {asset.status === 'ASSIGNED' && <option value="ASSIGNED">Assigned (ReadOnly)</option>}
-            </select>
-            {asset.status === 'ASSIGNED' && <p className="text-muted text-xs mt-1">Cannot change status while assigned.</p>}
-          </div>
-
-          <div className="form-group mb-6">
-            <label>Notes / Condition</label>
-            <textarea 
-              value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              rows={3}
-              placeholder="Add details about the device condition..."
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 mt-auto">
+          <div className="modal-footer">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Changes</>}
