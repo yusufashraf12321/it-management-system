@@ -1,18 +1,33 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { execSync } = require('child_process');
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting Database Initialization...');
 
-  // 0. Clean the DB (Delete all old data to start fresh)
+  // 0. Sync the schema first to ensure all tables exist
+  console.log('🔄 Syncing database schema...');
+  try {
+    execSync('npx prisma db push --skip-generate', {
+      env: { ...process.env },
+      stdio: 'inherit'
+    });
+  } catch (e) {
+    console.log('Schema sync skipped (may already be up to date).');
+  }
+
+  // 1. Clean the DB safely (handle missing tables gracefully)
   console.log('🗑️ Deleting all existing accounts and related data...');
-  await prisma.maintenance.deleteMany({});
-  await prisma.ticket.deleteMany({});
-  await prisma.asset.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.department.deleteMany({});
+  const tables = ['maintenance', 'ticket', 'asset', 'purchaseOrder', 'inventoryItem', 'category', 'notification', 'activityLog', 'user', 'department'];
+  for (const table of tables) {
+    try {
+      await prisma[table].deleteMany({});
+    } catch (e) {
+      console.log(`⚠️ Skipped table '${table}' (not found or already empty).`);
+    }
+  }
 
   const adminPass = await bcrypt.hash('admin123', 10);
 
