@@ -10,7 +10,7 @@ async function main() {
   // 0. Sync the schema first to ensure all tables exist
   console.log('🔄 Syncing database schema...');
   try {
-    execSync('npx prisma db push --skip-generate', {
+    execSync('npx prisma db push', {
       env: { ...process.env },
       stdio: 'inherit'
     });

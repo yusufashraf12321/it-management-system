@@ -8,7 +8,7 @@ export DATABASE_URL="file:/app/data/production.db"
 
 # Run Prisma migrations/push on every start to keep schema in sync
 echo "📦 Syncing database schema..."
-npx prisma db push --skip-generate
+npx prisma db push
 
 # Check if the database is empty (no users) and seed it if so
 USER_COUNT=$(node -e "
