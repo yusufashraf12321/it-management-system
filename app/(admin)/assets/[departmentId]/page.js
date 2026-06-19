@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { User, Monitor, Mail, Phone, Calendar, ArrowLeft, Loader2, Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { User, Monitor, Mail, Phone, Calendar, ArrowLeft, Loader2, Search, Plus, Edit2, Trash2, Printer } from 'lucide-react';
 import EmployeeProfileModal from '@/components/EmployeeProfileModal';
 import AddEmployeeModal from '@/components/AddEmployeeModal';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
+import PrintReceiptModal from '@/components/PrintReceiptModal';
 
 export default function DepartmentAssets() {
   const params = useParams();
@@ -17,6 +18,7 @@ export default function DepartmentAssets() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [printingUser, setPrintingUser] = useState(null);
 
   useEffect(() => {
     fetchDepartmentData();
@@ -60,6 +62,18 @@ export default function DepartmentAssets() {
     e.preventDefault();
     e.stopPropagation();
     setEditingEmployee(user);
+  };
+
+  const handlePrintClick = async (e, user) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/users/${user.id}`);
+      const userData = await res.json();
+      setPrintingUser(userData);
+    } catch (error) {
+      console.error('Error fetching user details for print:', error);
+    }
   };
 
   const handleDeleteEmployee = async (e, userId, fullName) => {
@@ -141,6 +155,7 @@ export default function DepartmentAssets() {
               <User size={32} />
               <div style={styles.cardActions}>
                 <button onClick={(e) => handleEditEmployee(e, user)} className="icon-btn-small" title="Edit Employee"><Edit2 size={14} /></button>
+                <button onClick={(e) => handlePrintClick(e, user)} className="icon-btn-small" title="Print IT Receipt" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'rgb(52, 211, 153)' }}><Printer size={14} /></button>
                 <button onClick={(e) => handleDeleteEmployee(e, user.id, user.fullName)} className="icon-btn-small danger" title="Delete Employee"><Trash2 size={14} /></button>
               </div>
             </div>
@@ -182,6 +197,13 @@ export default function DepartmentAssets() {
           user={editingEmployee}
           onClose={() => setEditingEmployee(null)} 
           onUpdate={fetchDepartmentData} 
+        />
+      )}
+
+      {printingUser && (
+        <PrintReceiptModal 
+          user={printingUser}
+          onClose={() => setPrintingUser(null)}
         />
       )}
     </div>

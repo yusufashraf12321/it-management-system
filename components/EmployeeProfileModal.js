@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Mail, Phone, Calendar, Monitor, Link2, Loader2, User } from 'lucide-react';
+import { X, Mail, Phone, Calendar, Monitor, Link2, Loader2, User, Printer } from 'lucide-react';
+import PrintReceiptModal from './PrintReceiptModal';
 
 export default function EmployeeProfileModal({ user, onClose, onAssetAssigned }) {
   const [isAssigning, setIsAssigning] = useState(false);
@@ -12,6 +13,7 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
   const [inventory, setInventory] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedModel, setSelectedModel] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Fetch inventory when starting assignment
   const fetchInventory = async () => {
@@ -140,10 +142,18 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
           {/* Assets Section */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl">Assigned Assets</h3>
-            <button className="btn btn-primary btn-sm" onClick={handleToggleAssign}>
-              <Link2 size={16} />
-              <span>{isAssigning ? 'Cancel' : 'Assign Asset'}</span>
-            </button>
+            <div className="flex gap-2">
+              {user.assignedAssets?.length > 0 && (
+                <button className="btn btn-success btn-sm" onClick={() => setIsPrinting(true)}>
+                  <Printer size={16} />
+                  <span>Print Receipt / طباعة عهدة</span>
+                </button>
+              )}
+              <button className="btn btn-primary btn-sm" onClick={handleToggleAssign}>
+                <Link2 size={16} />
+                <span>{isAssigning ? 'Cancel' : 'Assign Asset'}</span>
+              </button>
+            </div>
           </div>
 
           {isAssigning && (
@@ -226,6 +236,13 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
           <button onClick={onClose} className="btn btn-secondary">Close Profile</button>
         </div>
       </div>
+
+      {isPrinting && (
+        <PrintReceiptModal 
+          user={user}
+          onClose={() => setIsPrinting(false)}
+        />
+      )}
     </div>
   );
 }
