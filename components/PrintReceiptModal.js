@@ -398,7 +398,7 @@ export default function PrintReceiptModal({ user, docTypePreset = null, changeTy
           {/* Signature Block */}
           <div style={printStyles.footerSignSection}>
             <p style={printStyles.signDecl}>
-              By signing below, I declare my full responsibility for the company's assets.
+              {"By signing below, I declare my full responsibility for the company's assets."}
             </p>
             
             <div style={printStyles.signatureRow}>
