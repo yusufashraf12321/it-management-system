@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Mail, Phone, Calendar, Monitor, Link2, Loader2, User, Printer } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, Phone, Calendar, Monitor, Link2, Loader2, User, Printer, RefreshCw } from 'lucide-react';
 import PrintReceiptModal from './PrintReceiptModal';
+import SwapAssetModal from './SwapAssetModal';
 
 export default function EmployeeProfileModal({ user, onClose, onAssetAssigned }) {
+  const [currentUserState, setCurrentUserState] = useState(user);
   const [isAssigning, setIsAssigning] = useState(false);
   const [serialNumber, setSerialNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,6 +16,25 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedModel, setSelectedModel] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [swappingAsset, setSwappingAsset] = useState(null);
+
+  // Sync state if user prop changes
+  useEffect(() => {
+    setCurrentUserState(user);
+  }, [user]);
+
+  // Fetch user details from API
+  const refreshUser = async () => {
+    try {
+      const res = await fetch(`/api/users/${currentUserState.id}`);
+      const data = await res.json();
+      if (res.ok) {
+        setCurrentUserState(data);
+      }
+    } catch (err) {
+      console.error('Error refreshing user:', err);
+    }
+  };
 
   // Fetch inventory when starting assignment
   const fetchInventory = async () => {
@@ -51,7 +72,7 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
       const res = await fetch('/api/assets/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serialNumber, userId: user.id })
+        body: JSON.stringify({ serialNumber, userId: currentUserState.id })
       });
 
       const data = await res.json();
@@ -59,13 +80,16 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
 
       setSuccess('Asset assigned successfully!');
       setSerialNumber('');
+      
+      // Refresh list in parent and local modal
       if (onAssetAssigned) onAssetAssigned();
+      await refreshUser();
 
       setTimeout(() => {
         setIsAssigning(false);
         setSuccess('');
-        onClose();
-      }, 1500);
+        setIsPrinting(true); // Automatically open print custody handover modal!
+      }, 1000);
 
     } catch (err) {
       setError(err.message);
@@ -89,48 +113,48 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
           <div style={styles.profileSection} className="flex-mobile-col">
             <div style={styles.avatarLarge}>
               <span style={{ fontSize: '2rem', fontWeight: 600, color: 'white' }}>
-                {user.fullName.charAt(0)}
+                {currentUserState.fullName?.charAt(0)}
               </span>
             </div>
             
             <div style={{ flex: 1 }}>
-              <h2 className="text-2xl" style={{ marginBottom: '0.25rem' }}>{user.fullName}</h2>
-              <p className="text-muted" style={{ marginBottom: '1rem' }}>{user.jobTitle} • {user.department?.name}</p>
+              <h2 className="text-2xl" style={{ marginBottom: '0.25rem' }}>{currentUserState.fullName}</h2>
+              <p className="text-muted" style={{ marginBottom: '1rem' }}>{currentUserState.jobTitle} • {currentUserState.department?.name}</p>
               
               <div className="grid grid-cols-2 gap-4">
                 <div style={styles.infoRow}>
                   <Mail size={16} className="text-muted" />
                   <div>
                     <p style={styles.infoLabel}>Personal Email</p>
-                    <p style={styles.infoValue}>{user.personalEmail}</p>
+                    <p style={styles.infoValue}>{currentUserState.personalEmail}</p>
                   </div>
                 </div>
                 <div style={styles.infoRow}>
                   <Mail size={16} className="text-muted" />
                   <div>
                     <p style={styles.infoLabel}>Konecta Mail</p>
-                    <p style={styles.infoValue}>{user.konectaMail}</p>
+                    <p style={styles.infoValue}>{currentUserState.konectaMail}</p>
                   </div>
                 </div>
                 <div style={styles.infoRow}>
                   <Phone size={16} className="text-muted" />
                   <div>
                     <p style={styles.infoLabel}>Contact No.</p>
-                    <p style={styles.infoValue}>{user.contactNo}</p>
+                    <p style={styles.infoValue}>{currentUserState.contactNo}</p>
                   </div>
                 </div>
                 <div style={styles.infoRow}>
                   <Calendar size={16} className="text-muted" />
                   <div>
                     <p style={styles.infoLabel}>Hiring Date</p>
-                    <p style={styles.infoValue}>{new Date(user.hiringDate).toLocaleDateString()}</p>
+                    <p style={styles.infoValue}>{new Date(currentUserState.hiringDate).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <div style={styles.infoRow}>
                   <User size={16} className="text-muted" />
                   <div>
                     <p style={styles.infoLabel}>Reporting To</p>
-                    <p style={styles.infoValue}>{user.reportingTo || 'N/A'}</p>
+                    <p style={styles.infoValue}>{currentUserState.reportingTo || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -143,7 +167,7 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl">Assigned Assets</h3>
             <div className="flex gap-2">
-              {user.assignedAssets?.length > 0 && (
+              {currentUserState.assignedAssets?.length > 0 && (
                 <button className="btn btn-success btn-sm" onClick={() => setIsPrinting(true)}>
                   <Printer size={16} />
                   <span>Print Receipt / طباعة عهدة</span>
@@ -214,19 +238,30 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
                   <th className="p-3">Brand & Model</th>
                   <th className="p-3">Serial Number</th>
                   <th className="p-3">Date</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {user.assignedAssets?.map((asset) => (
+                {currentUserState.assignedAssets?.map((asset) => (
                   <tr key={asset.id} className="border-b border-white/5">
                     <td className="p-3"><span className="badge badge-info">{asset.inventoryItem?.category}</span></td>
                     <td className="p-3 font-semibold">{asset.inventoryItem?.brand} {asset.inventoryItem?.model}</td>
                     <td className="p-3 font-mono text-sm">{asset.serialNumber}</td>
                     <td className="p-3 text-sm">{asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString() : 'N/A'}</td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => setSwappingAsset(asset)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        <RefreshCw size={12} />
+                        <span>Swap</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
-                {(!user.assignedAssets || user.assignedAssets.length === 0) && (
-                  <tr><td colSpan="4" className="p-8 text-center text-muted">No assets assigned to this employee.</td></tr>
+                {(!currentUserState.assignedAssets || currentUserState.assignedAssets.length === 0) && (
+                  <tr><td colSpan="5" className="p-8 text-center text-muted">No assets assigned to this employee.</td></tr>
                 )}
               </tbody>
             </table>
@@ -239,13 +274,26 @@ export default function EmployeeProfileModal({ user, onClose, onAssetAssigned })
 
       {isPrinting && (
         <PrintReceiptModal 
-          user={user}
+          user={currentUserState}
           onClose={() => setIsPrinting(false)}
+        />
+      )}
+
+      {swappingAsset && (
+        <SwapAssetModal
+          user={currentUserState}
+          asset={swappingAsset}
+          onClose={() => setSwappingAsset(null)}
+          onUpdate={() => {
+            if (onAssetAssigned) onAssetAssigned();
+            refreshUser();
+          }}
         />
       )}
     </div>
   );
 }
+
 
 const styles = {
   header: {

@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { User, Monitor, Mail, Phone, Calendar, ArrowLeft, Loader2, Search, Plus, Edit2, Trash2, Printer } from 'lucide-react';
+import { User, Monitor, ArrowLeft, Loader2, Search, Plus, Edit2, Printer, LogOut } from 'lucide-react';
 import EmployeeProfileModal from '@/components/EmployeeProfileModal';
 import AddEmployeeModal from '@/components/AddEmployeeModal';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
+import ResignEmployeeModal from '@/components/ResignEmployeeModal';
 
 export default function DepartmentAssets() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function DepartmentAssets() {
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [printingUser, setPrintingUser] = useState(null);
+  const [resigningUser, setResigningUser] = useState(null);
 
   useEffect(() => {
     fetchDepartmentData();
@@ -30,10 +32,8 @@ export default function DepartmentAssets() {
         fetch(`/api/departments/${params.departmentId}`),
         fetch(`/api/users?departmentId=${params.departmentId}`)
       ]);
-      
       const deptData = await deptRes.json();
       const usersData = await usersRes.json();
-      
       setDepartment(deptData);
       setUsers(usersData);
     } catch (error) {
@@ -43,7 +43,7 @@ export default function DepartmentAssets() {
     }
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.fullName.toLowerCase().includes(search.toLowerCase()) ||
     user.jobTitle.toLowerCase().includes(search.toLowerCase())
   );
@@ -76,28 +76,26 @@ export default function DepartmentAssets() {
     }
   };
 
-  const handleDeleteEmployee = async (e, userId, fullName) => {
+  const handleResignClick = async (e, user) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!confirm(`Are you sure you want to delete employee "${fullName}"? Their assigned assets will be returned to stock.`)) {
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchDepartmentData();
-      } else {
-        alert('Failed to delete employee');
-      }
+      // Fetch full user with assets before opening modal
+      const res = await fetch(`/api/users/${user.id}`);
+      const userData = await res.json();
+      setResigningUser(userData);
     } catch (error) {
-      console.error('Error deleting employee:', error);
+      console.error('Error fetching user details for resignation:', error);
     }
   };
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 className="animate-spin" size={32} /></div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '4rem', flexDirection: 'column', gap: '1rem' }}>
+        <Loader2 style={{ animation: 'spin 1s linear infinite' }} size={32} />
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading department data...</span>
+      </div>
+    );
   }
 
   if (!department) {
@@ -106,65 +104,95 @@ export default function DepartmentAssets() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-4 mb-6">
+      {/* Page Header */}
+      <div style={styles.pageHeader}>
         <button onClick={() => router.back()} className="btn btn-secondary" style={{ padding: '0.5rem' }}>
           <ArrowLeft size={20} />
         </button>
-        <div>
-          <h2 className="text-2xl">{department.name}</h2>
-          <p className="text-muted">Employees and assigned assets</p>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>{department.name}</h2>
+          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
+            Asset tracking and employee custody management
+          </p>
         </div>
-        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setIsAddEmployeeModalOpen(true)}>
+        <button className="btn btn-primary" onClick={() => setIsAddEmployeeModalOpen(true)}>
           <Plus size={18} />
           <span>Add Employee</span>
         </button>
       </div>
 
-      <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-        <div className="flex justify-between items-center">
+      {/* Stats & Search Panel */}
+      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', width: '300px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search employees..." 
+            <Search size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search employees..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ paddingLeft: '2.5rem', width: '100%' }}
             />
           </div>
-          <div className="flex gap-4">
-            <div className="badge badge-info" style={{ padding: '0.5rem 1rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="badge badge-info" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
               {users.length} Employees
             </div>
-            <div className="badge badge-success" style={{ padding: '0.5rem 1rem' }}>
+            <div className="badge badge-success" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
               {department.assets?.length || 0} Total Assets
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-6">
+      {/* Employee Grid */}
+      <div style={styles.grid}>
         {filteredUsers.map((user) => (
-          <div 
-            key={user.id} 
-            className="glass-card" 
+          <div
+            key={user.id}
+            className="glass-card"
             style={styles.userCard}
             onClick={() => handleUserClick(user.id)}
           >
+            {/* Avatar */}
             <div style={styles.avatar}>
-              <User size={32} />
-              <div style={styles.cardActions}>
-                <button onClick={(e) => handleEditEmployee(e, user)} className="icon-btn-small" title="Edit Employee"><Edit2 size={14} /></button>
-                <button onClick={(e) => handlePrintClick(e, user)} className="icon-btn-small" title="Print IT Receipt" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: 'rgb(52, 211, 153)' }}><Printer size={14} /></button>
-                <button onClick={(e) => handleDeleteEmployee(e, user.id, user.fullName)} className="icon-btn-small danger" title="Delete Employee"><Trash2 size={14} /></button>
-              </div>
+              <User size={30} />
             </div>
+
+            {/* Name & Title */}
             <h3 style={styles.userName}>{user.fullName}</h3>
             <p style={styles.userTitle}>{user.jobTitle}</p>
-            
+
+            {/* Asset badge */}
             <div style={styles.assetBadge}>
-              <Monitor size={16} />
-              <span>{user._count.assignedAssets} Assets</span>
+              <Monitor size={14} />
+              <span>{user._count?.assignedAssets ?? 0} Assets</span>
+            </div>
+
+            {/* Action buttons — appear on hover via CSS classes */}
+            <div style={styles.cardActions} onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={(e) => handleEditEmployee(e, user)}
+                className="icon-btn-small"
+                title="Edit Employee"
+              >
+                <Edit2 size={13} />
+              </button>
+              <button
+                onClick={(e) => handlePrintClick(e, user)}
+                className="icon-btn-small"
+                style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'rgb(52, 211, 153)' }}
+                title="Print IT Receipt"
+              >
+                <Printer size={13} />
+              </button>
+              <button
+                onClick={(e) => handleResignClick(e, user)}
+                className="icon-btn-small danger"
+                title="Resign / Terminate Employee"
+              >
+                <LogOut size={13} />
+              </button>
             </div>
           </div>
         ))}
@@ -172,38 +200,47 @@ export default function DepartmentAssets() {
 
       {filteredUsers.length === 0 && (
         <div className="text-center text-muted p-6 glass-panel">
-          No employees found matching your search.
+          No employees found{search ? ` matching "${search}"` : ''}.
         </div>
       )}
 
+      {/* Modals */}
       {selectedUser && (
-        <EmployeeProfileModal 
-          user={selectedUser} 
-          onClose={() => setSelectedUser(null)} 
-          onAssetAssigned={fetchDepartmentData} // Refresh data if an asset is assigned
+        <EmployeeProfileModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          onAssetAssigned={fetchDepartmentData}
         />
       )}
 
       {isAddEmployeeModalOpen && (
-        <AddEmployeeModal 
+        <AddEmployeeModal
           departmentId={params.departmentId}
-          onClose={() => setIsAddEmployeeModalOpen(false)} 
-          onUpdate={fetchDepartmentData} 
+          onClose={() => setIsAddEmployeeModalOpen(false)}
+          onUpdate={fetchDepartmentData}
         />
       )}
 
       {editingEmployee && (
-        <EditEmployeeModal 
+        <EditEmployeeModal
           user={editingEmployee}
-          onClose={() => setEditingEmployee(null)} 
-          onUpdate={fetchDepartmentData} 
+          onClose={() => setEditingEmployee(null)}
+          onUpdate={fetchDepartmentData}
         />
       )}
 
       {printingUser && (
-        <PrintReceiptModal 
+        <PrintReceiptModal
           user={printingUser}
           onClose={() => setPrintingUser(null)}
+        />
+      )}
+
+      {resigningUser && (
+        <ResignEmployeeModal
+          user={resigningUser}
+          onClose={() => setResigningUser(null)}
+          onUpdate={fetchDepartmentData}
         />
       )}
     </div>
@@ -211,56 +248,68 @@ export default function DepartmentAssets() {
 }
 
 const styles = {
+  pageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+    flexWrap: 'wrap',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gap: '1.25rem',
+  },
   userCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
     cursor: 'pointer',
-    padding: '2rem 1.5rem',
+    padding: '2rem 1.25rem 1.25rem',
+    position: 'relative',
+    transition: 'all 0.2s',
   },
   avatar: {
-    width: '80px',
-    height: '80px',
+    width: '72px',
+    height: '72px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(16, 185, 129, 0.2))',
+    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(16, 185, 129, 0.25))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: 'var(--text-primary)',
     marginBottom: '1rem',
-    border: '2px solid rgba(255, 255, 255, 0.1)',
-    position: 'relative',
+    border: '2px solid rgba(255, 255, 255, 0.08)',
   },
   cardActions: {
     position: 'absolute',
-    top: '-5px',
-    right: '-45px',
+    top: '0.75rem',
+    right: '0.75rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '5px',
-    opacity: 0.8,
+    gap: '4px',
   },
   userName: {
-    fontSize: '1.125rem',
-    fontWeight: '600',
+    fontSize: '1rem',
+    fontWeight: '700',
     marginBottom: '0.25rem',
     color: 'var(--text-primary)',
   },
   userTitle: {
-    fontSize: '0.875rem',
+    fontSize: '0.8rem',
     color: 'var(--text-muted)',
-    marginBottom: '1.5rem',
+    marginBottom: '1rem',
   },
   assetBadge: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.5rem 1rem',
+    gap: '0.375rem',
+    padding: '0.375rem 0.875rem',
     background: 'rgba(15, 23, 42, 0.5)',
     borderRadius: '9999px',
-    fontSize: '0.875rem',
+    fontSize: '0.8rem',
     color: 'var(--text-secondary)',
     border: '1px solid var(--border-color)',
-  }
+  },
 };

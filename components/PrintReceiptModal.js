@@ -2,24 +2,38 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, CheckSquare, Square, FileText } from 'lucide-react';
+import { X, Printer, CheckSquare, Square, Shield, Info, Edit2 } from 'lucide-react';
 
-export default function PrintReceiptModal({ user, onClose }) {
-  const [docType, setDocType] = useState('assignment'); // 'assignment', 'release', 'change'
+export default function PrintReceiptModal({ user, docTypePreset = null, changeTypePreset = null, swapData = null, onClose }) {
+  const [docType, setDocType] = useState(docTypePreset || 'assignment'); // 'assignment', 'release', 'change'
   const [selectedAssets, setSelectedAssets] = useState([]);
-  const [notes, setNotes] = useState('');
-  const [changeType, setChangeType] = useState('permanent'); // 'permanent', 'temporary'
-  const [itSpecialist, setItSpecialist] = useState('');
+  const [notes, setNotes] = useState(swapData?.notes || '');
+  const [changeType, setChangeType] = useState(changeTypePreset || 'permanent'); // 'permanent', 'temporary'
+  
+  // Custom Specs inputs for the printable form (to match user's grid template)
+  const [cpu, setCpu] = useState('Core i5');
+  const [ram, setRam] = useState('16 GB');
+  const [storage, setStorage] = useState('512 GB');
+  const [os, setOs] = useState('Windows 11');
+  const [headset, setHeadset] = useState('Logitech');
+  const [headsetSerial, setHeadsetSerial] = useState('2452MET39GA9');
+  
+  // Signature & Info fields
+  const [manager, setManager] = useState(user?.reportingTo || '');
+  const [itSpecialist, setItSpecialist] = useState('IT Operations');
   const [isPrinting, setIsPrinting] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    if (docTypePreset) setDocType(docTypePreset);
+    if (changeTypePreset) setChangeType(changeTypePreset);
+
     // Default to select all assigned assets
     if (user && user.assignedAssets) {
       setSelectedAssets(user.assignedAssets.map(a => a.id));
     }
-  }, [user]);
+  }, [user, docTypePreset, changeTypePreset]);
 
   if (!mounted) return null;
 
@@ -32,7 +46,7 @@ export default function PrintReceiptModal({ user, onClose }) {
   };
 
   const handlePrint = () => {
-    if (selectedAssets.length === 0) {
+    if (!swapData && selectedAssets.length === 0 && docType !== 'release') {
       alert('Please select at least one asset to print.');
       return;
     }
@@ -43,20 +57,27 @@ export default function PrintReceiptModal({ user, onClose }) {
     }, 150);
   };
 
-  const activeAssets = user.assignedAssets?.filter(a => selectedAssets.includes(a.id)) || [];
-  const currentDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
-  const currentDateEn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  // Identify the primary device for the top grid (e.g. Laptop or Monitor)
+  let primaryAsset = null;
+  if (swapData) {
+    primaryAsset = swapData.newAsset;
+  } else if (user.assignedAssets && user.assignedAssets.length > 0) {
+    // Try to find a laptop first, or just take the first assigned asset
+    primaryAsset = user.assignedAssets.find(a => a.inventoryItem?.category.toLowerCase() === 'laptop') || user.assignedAssets[0];
+  }
 
-  // Render Modal UI + Portal for print layout
+  const activeAssets = user.assignedAssets?.filter(a => selectedAssets.includes(a.id)) || [];
+  const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' });
+
   return (
     <>
       {/* Modal Controller UI (no-print) */}
       <div className="modal-overlay no-print animate-fade-in">
-        <div className="modal-container" style={{ maxWidth: '650px' }}>
+        <div className="modal-container" style={{ maxWidth: '700px' }}>
           <div style={styles.modalHeader}>
             <div className="flex items-center gap-2">
-              <Printer className="text-accent-primary" size={22} />
-              <h2 className="text-xl">Print IT Receipt / طباعة مستند عهدة</h2>
+              <Shield className="text-accent-primary" size={22} />
+              <h2 className="text-xl">IT Document Generator</h2>
             </div>
             <button onClick={onClose} className="icon-btn-small">
               <X size={20} />
@@ -65,94 +86,122 @@ export default function PrintReceiptModal({ user, onClose }) {
 
           <div className="modal-body">
             <p className="text-muted mb-4" style={{ fontSize: '0.875rem' }}>
-              Generate official bilingual custody, return, or alteration documents for <strong>{user.fullName}</strong>.
+              Fill in the specification details to generate a corporate-standard printable form.
             </p>
 
-            {/* Document Type Selection */}
-            <div className="form-group">
-              <label className="form-label">Document Type / نوع المستند</label>
-              <div style={styles.radioGroup}>
-                <label style={{ ...styles.radioLabel, border: docType === 'assignment' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'assignment' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
-                  <input type="radio" name="docType" value="assignment" checked={docType === 'assignment'} onChange={() => setDocType('assignment')} style={{ marginRight: '8px' }} />
-                  <div>
-                    <strong style={{ display: 'block' }}>Custody Handover / تسليم عهدة</strong>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Assigning assets to employee</span>
-                  </div>
-                </label>
-                <label style={{ ...styles.radioLabel, border: docType === 'release' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'release' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
-                  <input type="radio" name="docType" value="release" checked={docType === 'release'} onChange={() => setDocType('release')} style={{ marginRight: '8px' }} />
-                  <div>
-                    <strong style={{ display: 'block' }}>IT Clearance / إخلاء طرف</strong>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Returning assets to inventory</span>
-                  </div>
-                </label>
-                <label style={{ ...styles.radioLabel, border: docType === 'change' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'change' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
-                  <input type="radio" name="docType" value="change" checked={docType === 'change'} onChange={() => setDocType('change')} style={{ marginRight: '8px' }} />
-                  <div>
-                    <strong style={{ display: 'block' }}>Custody Alteration / تعديل عهدة</strong>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>Replacing or changing assets</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Change Type Details (only shown if alteration selected) */}
-            {docType === 'change' && (
-              <div className="form-group" style={styles.subConfig}>
-                <label className="form-label">Alteration Type / نوع التعديل</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="changeType" value="permanent" checked={changeType === 'permanent'} onChange={() => setChangeType('permanent')} />
-                    <span>Permanent / دائم</span>
+            {/* Document Type Selection (Disabled if preset from swap/resign flows) */}
+            {!docTypePreset && (
+              <div className="form-group">
+                <label className="form-label">Document Type / نوع المستند</label>
+                <div style={styles.radioGroup}>
+                  <label style={{ ...styles.radioLabel, border: docType === 'assignment' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'assignment' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
+                    <input type="radio" name="docType" value="assignment" checked={docType === 'assignment'} onChange={() => setDocType('assignment')} style={{ marginRight: '8px' }} />
+                    <div>
+                      <strong style={{ display: 'block' }}>Custody Handover / تسليم عهدة</strong>
+                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>Assigning assets to employee</span>
+                    </div>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="changeType" value="temporary" checked={changeType === 'temporary'} onChange={() => setChangeType('temporary')} />
-                    <span>Temporary / مؤقت</span>
+                  <label style={{ ...styles.radioLabel, border: docType === 'release' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'release' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
+                    <input type="radio" name="docType" value="release" checked={docType === 'release'} onChange={() => setDocType('release')} style={{ marginRight: '8px' }} />
+                    <div>
+                      <strong style={{ display: 'block' }}>IT Clearance / إخلاء طرف</strong>
+                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>Returning assets to inventory</span>
+                    </div>
+                  </label>
+                  <label style={{ ...styles.radioLabel, border: docType === 'change' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', background: docType === 'change' ? 'rgba(59, 130, 246, 0.05)' : 'none' }}>
+                    <input type="radio" name="docType" value="change" checked={docType === 'change'} onChange={() => setDocType('change')} style={{ marginRight: '8px' }} />
+                    <div>
+                      <strong style={{ display: 'block' }}>Custody Alteration / تعديل عهدة</strong>
+                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>Replacing or changing assets</span>
+                    </div>
                   </label>
                 </div>
               </div>
             )}
 
-            {/* Select Assets list */}
-            <div className="form-group">
-              <label className="form-label">Select Assets / اختر الأجهزة المضمنة</label>
-              <div style={styles.assetList}>
-                {user.assignedAssets?.map(asset => (
-                  <div key={asset.id} style={styles.assetItem} onClick={() => toggleAsset(asset.id)}>
-                    {selectedAssets.includes(asset.id) ? (
-                      <CheckSquare size={18} className="text-accent-primary" />
-                    ) : (
-                      <Square size={18} className="text-muted" />
-                    )}
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontWeight: 600 }}>{asset.inventoryItem?.brand} {asset.inventoryItem?.model}</span>
-                      <span className="text-muted" style={{ fontSize: '0.75rem', marginLeft: '8px' }}>({asset.inventoryItem?.category})</span>
-                      <div className="text-muted font-mono" style={{ fontSize: '0.75rem' }}>S/N: {asset.serialNumber}</div>
+            {/* Document presets notice */}
+            {docTypePreset && (
+              <div className="flex items-center gap-2 mb-4 p-3 bg-accent-primary/10 border border-accent-primary/20 rounded-md text-sm text-accent-primary">
+                <Info size={16} />
+                <span>
+                  Preset Document Mode: <strong>{docType === 'release' ? 'Clearance' : docType === 'change' ? 'Device Swap (' + changeType + ')' : 'Custody Handover'}</strong>
+                </span>
+              </div>
+            )}
+
+            {/* Assets Selection list (hidden if it's a swap) */}
+            {!swapData && docType !== 'release' && (
+              <div className="form-group">
+                <label className="form-label">Include Assets / الأجهزة المضمنة بالطباعة</label>
+                <div style={styles.assetList}>
+                  {user.assignedAssets?.map(asset => (
+                    <div key={asset.id} style={styles.assetItem} onClick={() => toggleAsset(asset.id)}>
+                      {selectedAssets.includes(asset.id) ? (
+                        <CheckSquare size={18} className="text-accent-primary" />
+                      ) : (
+                        <Square size={18} className="text-muted" />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontWeight: 600 }}>{asset.inventoryItem?.brand} {asset.inventoryItem?.model}</span>
+                        <span className="text-muted" style={{ fontSize: '0.75rem', marginLeft: '8px' }}>({asset.inventoryItem?.category})</span>
+                        <div className="text-muted font-mono" style={{ fontSize: '0.75rem' }}>S/N: {asset.serialNumber}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {(!user.assignedAssets || user.assignedAssets.length === 0) && (
-                  <p className="text-center text-muted p-4">No assets assigned to this user / لا توجد أجهزة عهدة للموظف.</p>
-                )}
+                  ))}
+                  {(!user.assignedAssets || user.assignedAssets.length === 0) && (
+                    <p className="text-center text-muted p-4">No assets assigned / لا توجد أجهزة للموظف.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Editable Specs Grid for print output */}
+            <h3 style={{ fontSize: '0.95rem', fontWeight: '700', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>Print Specifications / تفاصيل المواصفات للطباعة</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="form-group">
+                <label className="form-label">CPU / المعالج</label>
+                <input type="text" value={cpu} onChange={(e) => setCpu(e.target.value)} placeholder="e.g. Core i5" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">RAM / الذاكرة العشوائية</label>
+                <input type="text" value={ram} onChange={(e) => setRam} placeholder="e.g. 16 GB" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Storage / مساحة التخزين</label>
+                <input type="text" value={storage} onChange={(e) => setStorage(e.target.value)} placeholder="e.g. 512 GB SSD" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Operating System / نظام التشغيل</label>
+                <input type="text" value={os} onChange={(e) => setOs(e.target.value)} placeholder="e.g. Windows 11" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Headset / سماعة الرأس</label>
+                <input type="text" value={headset} onChange={(e) => setHeadset(e.target.value)} placeholder="e.g. Logitech Headset" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Headset Serial / الرقم التسلسلي للسماعة</label>
+                <input type="text" value={headsetSerial} onChange={(e) => setHeadsetSerial(e.target.value)} placeholder="e.g. Serial code" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Direct Manager / المدير المباشر</label>
+                <input type="text" value={manager} onChange={(e) => setManager(e.target.value)} placeholder="e.g. Manager Name" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">IT Specialist / مسؤول الـ IT</label>
+                <input type="text" value={itSpecialist} onChange={(e) => setItSpecialist(e.target.value)} placeholder="e.g. IT Operations" />
               </div>
             </div>
 
-            {/* Input Details */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="form-group">
-                <label className="form-label">IT Specialist Name / اسم مسؤول الـ IT</label>
-                <input type="text" placeholder="e.g., Youssef Ashraf" value={itSpecialist} onChange={(e) => setItSpecialist(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Transaction Notes / ملاحظات إضافية</label>
-                <input type="text" placeholder="Reason for exchange, condition details, etc." value={notes} onChange={(e) => setNotes(e.target.value)} />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Transaction Notes / ملاحظات إضافية</label>
+              <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Condition details, swap reasons..." />
             </div>
           </div>
 
           <div className="modal-footer">
             <button onClick={onClose} className="btn btn-secondary">Cancel / إلغاء</button>
-            <button onClick={handlePrint} className="btn btn-success" disabled={selectedAssets.length === 0}>
+            <button onClick={handlePrint} className="btn btn-success">
               <Printer size={16} />
               <span>Generate & Print / توليد وطباعة</span>
             </button>
@@ -163,170 +212,205 @@ export default function PrintReceiptModal({ user, onClose }) {
       {/* Printable Sheet (Appended directly to Body, visible only during @media print) */}
       {isPrinting && createPortal(
         <div id="print-area" style={printStyles.container}>
-          {/* Company header logo area */}
-          <div style={printStyles.header}>
-            <div style={printStyles.headerRtl}>
-              <h1 style={printStyles.companyTitle}>كـونـكـتـا</h1>
-              <h2 style={printStyles.departmentTitle}>إدارة تقنية المعلومات</h2>
-            </div>
-            <div style={printStyles.headerLtr}>
-              <h1 style={printStyles.companyTitle}>KONECTA</h1>
-              <h2 style={printStyles.departmentTitle}>Information Technology Dept.</h2>
-            </div>
-          </div>
-
-          <div style={printStyles.dividerDouble}></div>
-
-          {/* Form Title */}
-          <div style={printStyles.titleContainer}>
-            {docType === 'assignment' && (
-              <>
-                <h2 style={printStyles.formTitleAr}>محضر تسليم عهدة أجهزة تقنية معلومات</h2>
-                <h3 style={printStyles.formTitleEn}>IT Device Custody Handover Form</h3>
-              </>
-            )}
-            {docType === 'release' && (
-              <>
-                <h2 style={printStyles.formTitleAr}>محضر استلام عهدة وإخلاء طرف</h2>
-                <h3 style={printStyles.formTitleEn}>IT Custody Return & Clearance Form</h3>
-              </>
-            )}
-            {docType === 'change' && (
-              <>
-                <h2 style={printStyles.formTitleAr}>محضر تعديل عهدة أجهزة (تعديل {changeType === 'permanent' ? 'دائم' : 'مؤقت'})</h2>
-                <h3 style={printStyles.formTitleEn}>IT Custody Alteration Form ({changeType === 'permanent' ? 'Permanent' : 'Temporary'})</h3>
-              </>
-            )}
-          </div>
-
-          {/* Employee Metadata */}
-          <div style={printStyles.sectionTitle}>
-            <span>بيانات الموظف / Employee Information</span>
-          </div>
-          <table style={printStyles.metaTable}>
+          {/* Boxed header */}
+          <table style={printStyles.headerTable}>
             <tbody>
               <tr>
-                <td style={printStyles.metaLabel}>اسم الموظف / Name:</td>
-                <td style={printStyles.metaValue}>{user.fullName}</td>
-                <td style={printStyles.metaLabel}>القسم / Department:</td>
-                <td style={printStyles.metaValue}>{user.department?.name || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td style={printStyles.metaLabel}>المسمى الوظيفي / Job Title:</td>
-                <td style={printStyles.metaValue}>{user.jobTitle || 'N/A'}</td>
-                <td style={printStyles.metaLabel}>تاريخ الطباعة / Date:</td>
-                <td style={printStyles.metaValue}>{currentDateEn} - {currentDate}</td>
-              </tr>
-              <tr>
-                <td style={printStyles.metaLabel}>البريد الإلكتروني / Email:</td>
-                <td style={printStyles.metaValue}>{user.konectaMail || user.personalEmail}</td>
-                <td style={printStyles.metaLabel}>مسؤول الـ IT / Support:</td>
-                <td style={printStyles.metaValue}>{itSpecialist || 'IT Operations'}</td>
+                <td style={printStyles.headerLogoCell}>
+                  <div style={printStyles.logoContainer}>
+                    <span style={printStyles.logoText}>Konecta</span>
+                  </div>
+                </td>
+                <td style={printStyles.headerTitleCell}>
+                  <div style={printStyles.deptTitle}>IT DEPARTMENT</div>
+                  <div style={printStyles.formTitle}>
+                    {docType === 'assignment' && 'EMPLOYEE CUSTODY FORM'}
+                    {docType === 'release' && 'EMPLOYEE RETURN & CLEARANCE FORM'}
+                    {docType === 'change' && `CUSTODY SWAP & ALTERATION FORM`}
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
 
-          {/* Declaration Statement */}
-          <div style={printStyles.declaration}>
-            {docType === 'assignment' && (
-              <p style={{ margin: 0, lineHeight: 1.6 }}>
-                <strong>إقرار استلام:</strong> أقر أنا الموظف الموضح بياناتي أعلاه بأنني قد استلمت الأجهزة والملحقات المذكورة في الجدول أدناه بحالة سليمة وجيدة كعهدة شخصية لأداء مهام عملي بالشركة، وأتعهد بالحفاظ عليها وعدم تسليمها للغير، وإعادتها فوراً إلى قسم تقنية المعلومات عند طلبي بذلك، أو عند انتهاء خدماتي بالشركة.
-                <br />
-                <span style={{ fontSize: '0.85rem', color: '#555', display: 'block', marginTop: '6px' }}>
-                  <strong>Acknowledgment:</strong> I, the employee mentioned above, acknowledge that I have received the devices listed below in good condition as personal custody to perform my duties, and I pledge to maintain them, not hand them to others, and return them to the IT Department immediately upon request or termination.
-                </span>
-              </p>
-            )}
-            {docType === 'release' && (
-              <p style={{ margin: 0, lineHeight: 1.6 }}>
-                <strong>إخلاء طرف عهدة:</strong> يشهد قسم تقنية المعلومات بشركة كونتكا بأنه قد تم فحص واستلام الأجهزة والملحقات المذكورة أدناه من الموظف المذكور أعلاه، وتم إرجاعها إلى المخازن وتبرئة ذمته من عهدة هذه الأجهزة المحددة.
-                <br />
-                <span style={{ fontSize: '0.85rem', color: '#555', display: 'block', marginTop: '6px' }}>
-                  <strong>Clearance:</strong> The IT Department certifies that the devices listed below have been inspected and returned to stock from the above-mentioned employee. The employee is hereby cleared of custody for these specified devices.
-                </span>
-              </p>
-            )}
-            {docType === 'change' && (
-              <p style={{ margin: 0, lineHeight: 1.6 }}>
-                <strong>تعديل عهدة:</strong> بموجب هذا المحضر، تم تعديل وتحديث العهدة العينية للموظف الموضح أعلاه وفقاً للتفاصيل المذكورة بالجدول أدناه ({changeType === 'permanent' ? 'تعديل دائم' : 'تعديل مؤقت'}).
-                <br />
-                <span style={{ fontSize: '0.85rem', color: '#555', display: 'block', marginTop: '6px' }}>
-                  <strong>Custody Modification:</strong> Pursuant to this document, the asset custody details of the employee named above have been updated and modified as described in the table below ({changeType === 'permanent' ? 'Permanent' : 'Temporary'}).
-                </span>
-              </p>
-            )}
-          </div>
-
-          {/* Assets Table */}
-          <div style={printStyles.sectionTitle}>
-            <span>الأجهزة والملحقات / Devices & Accessories</span>
-          </div>
-          <table style={printStyles.assetsTable}>
-            <thead>
-              <tr style={printStyles.tableHeader}>
-                <th style={{ ...printStyles.th, width: '50px' }}>#</th>
-                <th style={printStyles.th}>الفئة / Category</th>
-                <th style={printStyles.th}>الموديل والنوع / Brand & Model</th>
-                <th style={printStyles.th}>الرقم التسلسلي / Serial Number</th>
-                <th style={printStyles.th}>تاريخ الصرف / Assigned Date</th>
-                <th style={{ ...printStyles.th, width: '120px' }}>الملاحظات / Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeAssets.map((asset, index) => (
-                <tr key={asset.id}>
-                  <td style={{ ...printStyles.td, textAlign: 'center' }}>{index + 1}</td>
-                  <td style={printStyles.td}>{asset.inventoryItem?.category}</td>
-                  <td style={{ ...printStyles.td, fontWeight: 'bold' }}>{asset.inventoryItem?.brand} {asset.inventoryItem?.model}</td>
-                  <td style={{ ...printStyles.td, fontFamily: 'monospace', fontSize: '0.9rem' }}>{asset.serialNumber}</td>
-                  <td style={printStyles.td}>{asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString() : 'N/A'}</td>
-                  <td style={printStyles.td}>-</td>
+          {/* Metadata Block */}
+          <div style={printStyles.metaBlock}>
+            <table style={printStyles.metaTable}>
+              <tbody>
+                <tr>
+                  <td style={printStyles.metaLeft}>
+                    <strong>Name:</strong> {user.fullName}
+                  </td>
+                  <td style={printStyles.metaRight}>
+                    <strong>Date:</strong> {currentDate}
+                  </td>
                 </tr>
-              ))}
+              </tbody>
+            </table>
+            <p style={printStyles.introText}>
+              {docType === 'assignment' && "This form declares Konecta EGYPT employees responsible for the company's assets in their custody."}
+              {docType === 'release' && "This form certifies that the employee has returned all company assets to the IT department custody."}
+              {docType === 'change' && `This form registers changes (type: ${changeType.toUpperCase()}) in the company assets assigned to the employee.`}
+            </p>
+          </div>
+
+          {/* Swap details or single Device grid */}
+          {docType === 'change' && swapData ? (
+            <>
+              {/* Swap Device Tables */}
+              <div style={printStyles.sectionHeader}>Returned Device / الأجهزة المسترجعة</div>
+              <table style={printStyles.gridTable}>
+                <tbody>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Device Type</td>
+                    <td style={printStyles.gridValue}>{swapData.oldAsset.inventoryItem?.category || 'Laptop'}</td>
+                    <td style={printStyles.gridLabel}>Brand</td>
+                    <td style={printStyles.gridBrandValue}>{swapData.oldAsset.inventoryItem?.brand || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Model</td>
+                    <td style={printStyles.gridModelValue}>{swapData.oldAsset.inventoryItem?.model || 'N/A'}</td>
+                    <td style={printStyles.gridLabel}>Serial Number</td>
+                    <td style={printStyles.gridSerialValue}>{swapData.oldAsset.serialNumber}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style={printStyles.sectionHeader}>Replacement Device / الأجهزة المسلمة الجديدة</div>
+              <table style={printStyles.gridTable}>
+                <tbody>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Device Type</td>
+                    <td style={printStyles.gridValue}>{swapData.newAsset.inventoryItem?.category || 'Laptop'}</td>
+                    <td style={printStyles.gridLabel}>Brand</td>
+                    <td style={printStyles.gridBrandValue}>{swapData.newAsset.inventoryItem?.brand || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Model</td>
+                    <td style={printStyles.gridModelValue}>{swapData.newAsset.inventoryItem?.model || 'N/A'}</td>
+                    <td style={printStyles.gridLabel}>Serial Number</td>
+                    <td style={printStyles.gridSerialValue}>{swapData.newAsset.serialNumber}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <>
+              {/* Main Device Details */}
+              <div style={printStyles.sectionHeader}>Device</div>
+              <table style={printStyles.gridTable}>
+                <tbody>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Device Type</td>
+                    <td style={printStyles.gridValue}>{primaryAsset?.inventoryItem?.category || 'Laptop'}</td>
+                    <td style={printStyles.gridLabel}>Brand</td>
+                    <td style={printStyles.gridBrandValue}>{primaryAsset?.inventoryItem?.brand || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td style={printStyles.gridLabel}>Model</td>
+                    <td style={printStyles.gridModelValue}>{primaryAsset?.inventoryItem?.model || 'N/A'}</td>
+                    <td style={printStyles.gridLabel}>Serial Number</td>
+                    <td style={printStyles.gridSerialValue}>{primaryAsset?.serialNumber || 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* System Specs Table */}
+          <div style={printStyles.sectionHeader}>System Specs</div>
+          <table style={printStyles.gridTable}>
+            <tbody>
+              <tr>
+                <td style={printStyles.gridLabel}>CPU</td>
+                <td style={printStyles.gridValue}>{cpu}</td>
+                <td style={printStyles.gridLabel}>Memory (RAM)</td>
+                <td style={printStyles.gridValue}>{ram}</td>
+              </tr>
+              <tr>
+                <td style={printStyles.gridLabel}>Storage</td>
+                <td style={printStyles.gridValue}>{storage}</td>
+                <td style={printStyles.gridLabel}>Operating System</td>
+                <td style={printStyles.gridValue}>{os}</td>
+              </tr>
+              <tr>
+                <td style={printStyles.gridLabel}>Headset</td>
+                <td style={printStyles.gridValue}>{headset}</td>
+                <td style={printStyles.gridLabel}>Serial Number</td>
+                <td style={printStyles.gridValue}>{headsetSerial}</td>
+              </tr>
             </tbody>
           </table>
 
-          {/* Transaction Notes (if provided) */}
-          {notes && (
-            <div style={printStyles.notesArea}>
-              <strong>ملاحظات إضافية / Additional Notes:</strong>
-              <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', fontSize: '0.9rem' }}>{notes}</p>
+          {/* Employee INFO Table */}
+          <div style={printStyles.sectionHeader}>Employee INFO</div>
+          <table style={printStyles.gridTable}>
+            <tbody>
+              <tr>
+                <td style={printStyles.gridLabel}>Employee name:</td>
+                <td style={printStyles.gridValue}>{user.fullName}</td>
+                <td style={printStyles.gridLabel}>Title/Department</td>
+                <td style={printStyles.gridValue}>{user.jobTitle} / {user.department?.name || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style={printStyles.gridLabel}>Manager</td>
+                <td style={printStyles.gridValue}>{manager || '................................'}</td>
+                <td style={printStyles.gridLabel}>Contact:</td>
+                <td style={printStyles.gridValue}>{user.contactNo || '................................'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Additional details if multiple assets are assigned (but not in swap) */}
+          {!swapData && activeAssets.length > 1 && (
+            <div style={{ marginTop: '15px' }}>
+              <div style={printStyles.sectionHeader}>Additional Accessories & Assets</div>
+              <table style={printStyles.accessoriesTable}>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Model & Brand</th>
+                    <th>Serial Number</th>
+                    <th>Assign Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeAssets.filter(a => a.id !== primaryAsset?.id).map((asset) => (
+                    <tr key={asset.id}>
+                      <td>{asset.inventoryItem?.category}</td>
+                      <td>{asset.inventoryItem?.brand} {asset.inventoryItem?.model}</td>
+                      <td>{asset.serialNumber}</td>
+                      <td>{asset.assignedDate ? new Date(asset.assignedDate).toLocaleDateString() : currentDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Print Date & Signatures Block */}
-          <div style={printStyles.signatureContainer}>
-            <div style={printStyles.sigBox}>
-              <p style={printStyles.sigTitle}>الموظف المستلم / Receiver</p>
-              <div style={printStyles.sigLine}></div>
-              <p style={printStyles.sigDetails}>الاسم / Name: {user.fullName}</p>
-              <p style={printStyles.sigDetails}>التوقيع / Signature:</p>
-              <p style={printStyles.sigDetails}>التاريخ / Date:</p>
+          {/* Notes area */}
+          {notes && (
+            <div style={{ marginTop: '15px', border: '1px solid #000', padding: '8px', fontSize: '0.85rem' }}>
+              <strong>Transaction Notes:</strong> {notes}
             </div>
+          )}
 
-            <div style={printStyles.sigBox}>
-              <p style={printStyles.sigTitle}>مسؤول تقنية المعلومات / IT Support</p>
-              <div style={printStyles.sigLine}></div>
-              <p style={printStyles.sigDetails}>الاسم / Name: {itSpecialist || '................................'}</p>
-              <p style={printStyles.sigDetails}>التوقيع / Signature:</p>
-              <p style={printStyles.sigDetails}>التاريخ / Date:</p>
-            </div>
-
-            <div style={printStyles.sigBox}>
-              <p style={printStyles.sigTitle}>اعتماد القسم / Dept. Head Approval</p>
-              <div style={printStyles.sigLine}></div>
-              <p style={printStyles.sigDetails}>الاسم / Name: ................................</p>
-              <p style={printStyles.sigDetails}>التوقيع / Signature:</p>
-              <p style={printStyles.sigDetails}>التاريخ / Date:</p>
-            </div>
-          </div>
-
-          {/* Corporate Footer */}
-          <div style={printStyles.footer}>
-            <div style={printStyles.dividerLine}></div>
-            <p style={printStyles.footerText}>
-              شركة كونتكا - تقنية المعلومات | Konecta Corp - IT Department &copy; {new Date().getFullYear()}
+          {/* Signature Block */}
+          <div style={printStyles.footerSignSection}>
+            <p style={printStyles.signDecl}>
+              By signing below, I declare my full responsibility for the company's assets.
             </p>
+            
+            <div style={printStyles.signatureRow}>
+              <div style={printStyles.sigBox}>
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '25px' }}>IT Signature</div>
+                <div>. . . . . . . . . . . . . . . . . .</div>
+              </div>
+              <div style={printStyles.sigBox}>
+                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '25px' }}>Employee Signature</div>
+                <div>. . . . . . . . . . . . . . . . . .</div>
+              </div>
+            </div>
           </div>
         </div>,
         document.body
@@ -335,7 +419,6 @@ export default function PrintReceiptModal({ user, onClose }) {
   );
 }
 
-// Styling definitions for Modal and Print layouts
 const styles = {
   modalHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -346,119 +429,164 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem'
   },
   radioLabel: {
-    display: 'flex', alignItems: 'flex-start', padding: '1rem',
-    borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s',
-  },
-  subConfig: {
-    background: 'rgba(255, 255, 255, 0.02)', padding: '1rem',
-    borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)',
-    marginTop: '-0.5rem', marginBottom: '1rem'
+    display: 'flex', alignItems: 'flex-start', padding: '0.875rem',
+    borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s',
   },
   assetList: {
-    maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+    maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column',
     gap: '0.5rem', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.3)',
-    borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)',
+    borderRadius: '8px', border: '1px solid var(--border-color)',
   },
   assetItem: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
-    background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)',
+    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem',
+    background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px',
     border: '1px solid rgba(255, 255, 255, 0.05)', cursor: 'pointer', transition: 'all 0.2s',
   },
 };
 
-// Official Corporate Print styling (rendered only in printing window.print)
+// CSS print styling matching the exact template design
 const printStyles = {
   container: {
-    direction: 'rtl',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    padding: '15mm 15mm',
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    padding: '10mm 15mm',
     backgroundColor: '#ffffff',
     color: '#000000',
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    boxSizing: 'border-box',
   },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: '8px'
+  headerTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    border: '1.5px solid #000000',
+    marginBottom: '20px',
   },
-  headerRtl: {
-    textAlign: 'right',
+  headerLogoCell: {
+    width: '60%',
+    padding: '20px 25px',
+    verticalAlign: 'middle',
+    borderRight: '1.5px solid #000000',
   },
-  headerLtr: {
-    textAlign: 'left',
-    direction: 'ltr'
+  logoContainer: {
+    display: 'flex',
+    alignItems: 'center',
   },
-  companyTitle: {
-    fontSize: '1.6rem', fontWeight: '800', margin: '0', color: '#000000', letterSpacing: '1px'
+  logoText: {
+    fontSize: '2.5rem',
+    fontWeight: '800',
+    letterSpacing: '-2px',
+    color: '#0d1b2e',
   },
-  departmentTitle: {
-    fontSize: '0.95rem', fontWeight: '600', margin: '4px 0 0 0', color: '#444444'
+  headerTitleCell: {
+    width: '40%',
+    padding: '15px',
+    textAlign: 'center',
+    verticalAlign: 'middle',
   },
-  dividerDouble: {
-    borderBottom: '3px double #000000', margin: '12px 0 20px 0'
+  deptTitle: {
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    letterSpacing: '1px',
+    marginBottom: '8px',
   },
-  titleContainer: {
-    textAlign: 'center', marginBottom: '25px', padding: '6px 0'
+  formTitle: {
+    fontSize: '0.85rem',
+    fontWeight: '800',
+    color: '#000000',
   },
-  formTitleAr: {
-    fontSize: '1.45rem', fontWeight: 'bold', margin: '0', color: '#000000'
-  },
-  formTitleEn: {
-    fontSize: '1.1rem', fontWeight: '500', margin: '5px 0 0 0', color: '#333333', letterSpacing: '0.5px'
-  },
-  sectionTitle: {
-    background: '#f2f2f2', padding: '6px 12px', fontSize: '0.95rem', fontWeight: 'bold',
-    borderRight: '4px solid #000000', marginBottom: '10px', display: 'flex', justifyContent: 'space-between',
-    direction: 'rtl'
+  metaBlock: {
+    marginBottom: '15px',
   },
   metaTable: {
-    width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '0.9rem'
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginBottom: '8px',
   },
-  metaLabel: {
-    padding: '8px', fontWeight: 'bold', color: '#222', border: '1px solid #ddd', width: '18%', background: '#fafafa'
+  metaLeft: {
+    fontSize: '0.95rem',
+    textAlign: 'left',
   },
-  metaValue: {
-    padding: '8px', border: '1px solid #ddd', width: '32%'
+  metaRight: {
+    fontSize: '0.95rem',
+    textAlign: 'right',
   },
-  declaration: {
-    border: '1px solid #000000', padding: '12px 16px', borderRadius: '4px',
-    backgroundColor: '#fcfcfc', marginBottom: '25px', fontSize: '0.9rem', textAlign: 'justify'
+  introText: {
+    fontSize: '0.85rem',
+    lineHeight: '1.4',
+    margin: '10px 0 0 0',
   },
-  assetsTable: {
-    width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '0.9rem'
+  sectionHeader: {
+    fontSize: '0.95rem',
+    fontWeight: 'bold',
+    margin: '15px 0 6px 0',
   },
-  tableHeader: {
-    background: '#f2f2f2'
+  gridTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    border: '1.5px solid #000000',
+    marginBottom: '10px',
   },
-  th: {
-    border: '1px solid #000000', padding: '8px', fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'right'
+  gridLabel: {
+    width: '20%',
+    padding: '6px 8px',
+    fontWeight: 'bold',
+    fontSize: '0.85rem',
+    border: '1px solid #000000',
+    backgroundColor: '#fafafa',
   },
-  td: {
-    border: '1px solid #dddddd', padding: '8px', fontSize: '0.85rem'
+  gridValue: {
+    width: '30%',
+    padding: '6px 8px',
+    fontSize: '0.85rem',
+    border: '1px solid #000000',
   },
-  notesArea: {
-    border: '1px solid #ddd', padding: '10px 15px', borderRadius: '4px', fontSize: '0.85rem', marginBottom: '25px'
+  gridBrandValue: {
+    width: '30%',
+    padding: '6px 8px',
+    fontSize: '0.85rem',
+    fontWeight: 'bold',
+    border: '1px solid #000000',
+    color: '#2563eb', // THINKPAD in blue color
   },
-  signatureContainer: {
-    display: 'flex', justifyContent: 'space-between', gap: '20px', marginTop: '40px', marginBottom: '40px'
+  gridModelValue: {
+    width: '30%',
+    padding: '6px 8px',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    border: '1px solid #000000',
+    color: '#2563eb', // Blue model
+  },
+  gridSerialValue: {
+    width: '30%',
+    padding: '6px 8px',
+    fontSize: '0.85rem',
+    fontWeight: 'bold',
+    border: '1px solid #000000',
+  },
+  accessoriesTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    border: '1px solid #000000',
+    fontSize: '0.8rem',
+  },
+  footerSignSection: {
+    marginTop: 'auto',
+    paddingTop: '20px',
+  },
+  signDecl: {
+    textAlign: 'center',
+    fontStyle: 'italic',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    marginBottom: '35px',
+  },
+  signatureRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '0 40px',
   },
   sigBox: {
-    flex: 1, border: '1px solid #ddd', borderRadius: '4px', padding: '12px', fontSize: '0.85rem', backgroundColor: '#fcfcfc'
-  },
-  sigTitle: {
-    fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: '6px', margin: '0 0 12px 0', textAlign: 'center'
-  },
-  sigLine: {
-    height: '40px'
-  },
-  sigDetails: {
-    margin: '4px 0 0 0', fontSize: '0.8rem', color: '#333'
-  },
-  footer: {
-    marginTop: 'auto', textAlign: 'center'
-  },
-  dividerLine: {
-    borderBottom: '1px solid #cccccc', marginBottom: '8px'
-  },
-  footerText: {
-    fontSize: '0.75rem', color: '#666666', margin: '0'
+    textAlign: 'center',
   }
 };
