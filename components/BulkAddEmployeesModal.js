@@ -1,288 +1,413 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Upload, FileText, Loader2, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { useState, useRef } from 'react';
+import {
+  X, Upload, FileText, Loader2, AlertCircle,
+  CheckCircle2, Download, RefreshCw
+} from 'lucide-react';
 
-export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate }) {
-  const [activeTab, setActiveTab] = useState('paste'); // 'paste' or 'upload'
-  const [pasteText, setPasteText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [parsedEmployees, setParsedEmployees] = useState([]);
-  const [conflicts, setConflicts] = useState([]);
+// ─── Column definitions in exact CSV order ─────────────────────────────────
+// Index: 0..18
+const COLUMNS = [
+  { key: 'fullName',       label: 'Full Name',            required: true  },
+  { key: 'jobTitle',       label: 'Job Title',            required: true  },
+  { key: 'personalEmail',  label: 'Personal Email',       required: true  },
+  { key: 'konectaMail',    label: 'Konecta Mail',         required: true  },
+  { key: 'contactNo',      label: 'Contact No.',          required: false },
+  { key: 'hiringDate',     label: 'Hiring Date',          required: false },
+  { key: 'reportingTo',    label: 'Reporting To',         required: false },
+  { key: 'laptopModel',    label: 'Laptop Model',         required: false },
+  { key: 'laptopGen',      label: 'Gen',                  required: false },
+  { key: 'processorCore',  label: 'Processor Core',       required: false },
+  { key: 'ram',            label: 'RAM',                  required: false },
+  { key: 'harddisk',       label: 'Harddisk',             required: false },
+  { key: 'laptopSerial',   label: 'Laptop Serial No',     required: false },
+  { key: 'laptopBrand',    label: 'Laptop Brand',         required: false },
+  { key: 'macSerial',      label: 'MAC Serial',           required: false },
+  { key: 'macEthernet',    label: 'MAC Ethernet',         required: false },
+  { key: 'windowsLicense', label: 'Windows License',      required: false },
+  { key: 'headsetSerial',  label: 'Headset S/N',          required: false },
+  { key: 'screenSerial',   label: 'Screen S/N',           required: false },
+];
 
-  // CSV parsing logic client side
-  const parseCSVData = (text) => {
-    setError('');
-    setConflicts([]);
-    
-    if (!text.trim()) {
-      setParsedEmployees([]);
-      return;
+// Parse a single CSV line (handles quoted values with commas)
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
     }
+  }
+  result.push(current.trim());
+  return result;
+}
 
-    const lines = text.split('\n');
-    const list = [];
+// Detect if first row is a header
+function isHeaderRow(cols) {
+  const lower = (cols[0] || '').toLowerCase();
+  return (
+    lower.includes('name') ||
+    lower.includes('full') ||
+    lower.includes('employee')
+  );
+}
+
+// Build a row object from CSV columns
+function rowFromCols(cols) {
+  const obj = {};
+  COLUMNS.forEach((col, idx) => {
+    obj[col.key] = cols[idx] || '';
+  });
+  return obj;
+}
+
+// Validate a parsed row
+function validateRow(row) {
+  const errors = [];
+  if (!row.fullName)       errors.push('Name required');
+  if (!row.jobTitle)       errors.push('Job Title required');
+  if (!row.personalEmail || !row.personalEmail.includes('@'))
+                           errors.push('Valid Personal Email required');
+  if (!row.konectaMail   || !row.konectaMail.includes('@'))
+                           errors.push('Valid Konecta Email required');
+  return errors;
+}
+
+// Count how many devices a row has
+function countDevices(row) {
+  return [
+    row.laptopSerial, row.macSerial, row.windowsLicense,
+    row.headsetSerial, row.screenSerial
+  ].filter(s => s?.trim()).length;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate }) {
+  const [activeTab, setActiveTab]           = useState('paste');
+  const [pasteText, setPasteText]           = useState('');
+  const [parsedRows, setParsedRows]         = useState([]);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState('');
+  const [conflicts, setConflicts]           = useState([]);
+  const [success, setSuccess]               = useState('');
+  const fileInputRef                        = useRef(null);
+
+  // ── Parse ──────────────────────────────────────────────────────────────────
+  const parseText = (text) => {
+    setError(''); setConflicts([]);
+    if (!text.trim()) { setParsedRows([]); return; }
+
+    const lines  = text.split('\n');
+    const result = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      // Handle CSV parsing (splitting by comma, taking care of possible whitespace)
-      const columns = line.split(',').map(col => col.trim());
+      const cols = parseCSVLine(line);
 
-      // Let's check headers. If the first row matches template columns, skip it
-      if (i === 0 && (
-        columns[0].toLowerCase().includes('name') || 
-        columns[2]?.toLowerCase().includes('email')
-      )) {
-        continue;
-      }
+      // Skip header if detected on first row
+      if (i === 0 && isHeaderRow(cols)) continue;
 
-      // Expected columns: Name, Job Title, Personal Email, Konecta Email, Contact Number, Hiring Date, Reporting To
-      const [fullName, jobTitle, personalEmail, konectaMail, contactNo, hiringDate, reportingTo] = columns;
-
-      const emp = {
-        fullName: fullName || '',
-        jobTitle: jobTitle || '',
-        personalEmail: personalEmail || '',
-        konectaMail: konectaMail || '',
-        contactNo: contactNo || '',
-        hiringDate: hiringDate || new Date().toISOString().split('T')[0],
-        reportingTo: reportingTo || '',
-        errors: []
-      };
-
-      // Perform validation checks
-      if (!emp.fullName) emp.errors.push('Name is required');
-      if (!emp.jobTitle) emp.errors.push('Job title is required');
-      if (!emp.personalEmail || !emp.personalEmail.includes('@')) emp.errors.push('Valid Personal Email is required');
-      if (!emp.konectaMail || !emp.konectaMail.includes('@')) emp.errors.push('Valid Konecta Email is required');
-      if (!emp.contactNo) emp.errors.push('Contact number is required');
-
-      list.push(emp);
+      const row    = rowFromCols(cols);
+      row._errors  = validateRow(row);
+      result.push(row);
     }
 
-    setParsedEmployees(list);
+    setParsedRows(result);
   };
 
-  const handleTextChange = (e) => {
+  const handlePasteChange = (e) => {
     setPasteText(e.target.value);
-    parseCSVData(e.target.value);
+    parseText(e.target.value);
   };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target.result;
+    reader.onload = ev => {
+      const text = ev.target.result;
       setPasteText(text);
-      parseCSVData(text);
+      parseText(text);
     };
     reader.readAsText(file);
   };
 
+  // ── Download template ──────────────────────────────────────────────────────
+  const downloadTemplate = () => {
+    const header = COLUMNS.map(c => c.label).join(',');
+    const example = [
+      'John Doe', 'Developer', 'john@gmail.com', 'john.doe@konecta.com',
+      '01012345678', '2026-06-23', 'Manager Name',
+      'ThinkPad E14', '12th', 'i5', '16GB', '512GB SSD',
+      'LP-SN-001', 'Lenovo',
+      'MAC-SN-001', 'MAC-ETH-001',
+      'WIN-LIC-001', 'HS-SN-001', 'SCR-SN-001'
+    ].join(',');
+    const csv  = `${header}\n${example}`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url; a.download = 'bulk_employees_template.csv';
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleImport = async () => {
-    if (parsedEmployees.length === 0) return;
-    
-    // Check if there are any client-side validation errors
-    const hasErrors = parsedEmployees.some(emp => emp.errors.length > 0);
+    if (parsedRows.length === 0) return;
+    const hasErrors = parsedRows.some(r => r._errors.length > 0);
     if (hasErrors) {
-      setError('Please fix all validation errors before importing / يرجى تصحيح أخطاء التحقق قبل الاستيراد.');
+      setError('Please fix all validation errors before importing.');
       return;
     }
 
-    setLoading(true);
-    setError('');
-    setConflicts([]);
+    setLoading(true); setError(''); setConflicts([]);
+
+    // Strip internal _errors key before sending
+    const cleanRows = parsedRows.map(({ _errors, ...rest }) => rest);
 
     try {
-      const res = await fetch('/api/users/bulk', {
-        method: 'POST',
+      const res  = await fetch('/api/users/bulk-with-assets', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          users: parsedEmployees,
-          departmentId
-        })
+        body:    JSON.stringify({ rows: cleanRows, departmentId })
       });
-
       const data = await res.json();
 
       if (res.ok) {
-        setSuccess(`Successfully imported ${data.count} employees!`);
-        setTimeout(() => {
-          onUpdate();
-          onClose();
-        }, 1500);
+        setSuccess(`✅ Successfully imported ${data.count} employees with their devices!`);
+        setTimeout(() => { onUpdate(); onClose(); }, 1800);
       } else {
-        setError(data.error || 'Failed to import users');
-        if (data.conflicts) {
-          setConflicts(data.conflicts);
-        }
+        setError(data.error || 'Import failed');
+        if (data.conflicts) setConflicts(data.conflicts);
       }
-    } catch (err) {
-      setError('An unexpected error occurred during the import process');
+    } catch {
+      setError('Unexpected error during import');
     } finally {
       setLoading(false);
     }
   };
 
+  const totalErrors   = parsedRows.filter(r => r._errors.length > 0).length;
+  const totalDevices  = parsedRows.reduce((s, r) => s + countDevices(r), 0);
+  const canImport     = parsedRows.length > 0 && totalErrors === 0 && !loading;
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="modal-overlay animate-fade-in no-print">
-      <div className="modal-container" style={{ maxWidth: '850px', width: '90%' }}>
-        <div style={styles.header}>
-          <div className="flex items-center gap-2 text-accent-primary">
-            <Upload size={22} />
-            <h2 className="text-xl">Bulk Upload Employees / رفع جماعي للموظفين</h2>
+      <div className="modal-container" style={{ maxWidth: '960px', width: '95%' }}>
+
+        {/* Header */}
+        <div style={s.header}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Upload size={22} style={{ color: 'var(--accent-primary)' }} />
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+                Bulk Upload Employees & Assets
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Import employees with their assigned devices in one step
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="icon-btn-small">
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className="icon-btn-small"><X size={20} /></button>
         </div>
 
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="modal-body" style={{ gap: '1rem', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Alerts */}
           {error && (
-            <div className="badge badge-danger p-3" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', alignItems: 'center' }}>
-              <div className="flex items-center gap-2">
-                <AlertCircle size={16} />
-                <span>{error}</span>
-              </div>
-              {conflicts.length > 0 && (
-                <div style={{ fontSize: '0.8rem', marginTop: '0.5rem', textAlign: 'left', alignSelf: 'stretch', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
-                  <strong>Conflicts:</strong>
-                  <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
-                    {conflicts.map((c, idx) => <li key={idx}>{c}</li>)}
+            <div style={s.alert('danger')}>
+              <AlertCircle size={16} />
+              <div>
+                <div>{error}</div>
+                {conflicts.length > 0 && (
+                  <ul style={{ margin: '0.25rem 0 0 1rem', fontSize: '0.78rem' }}>
+                    {conflicts.map((c, i) => <li key={i}>{c}</li>)}
                   </ul>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
-
           {success && (
-            <div className="badge badge-success p-3" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}>
-              <CheckCircle2 size={18} />
-              <span>{success}</span>
+            <div style={s.alert('success')}>
+              <CheckCircle2 size={16} /> <span>{success}</span>
             </div>
           )}
 
-          {/* Form instructions */}
-          <div style={styles.instructions}>
-            <strong>Format Details:</strong> CSV/Text fields must be comma-separated in this exact order:<br />
-            <code style={styles.codeBlock}>
-              Full Name, Job Title, Personal Email, Konecta Email, Contact Number, Hiring Date (YYYY-MM-DD), Reporting To (Optional)
+          {/* Format guide */}
+          <div style={s.guide}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '0.82rem' }}>Required column order (19 columns):</strong>
+              <button onClick={downloadTemplate} style={s.dlBtn}>
+                <Download size={13} /> Download Template CSV
+              </button>
+            </div>
+            <code style={s.code}>
+              Full Name, Job Title, Personal Email, Konecta Mail, Contact No., Hiring Date, Reporting To,
+              Laptop Model, Gen, Processor Core, RAM, Harddisk, Laptop Serial No, Laptop Brand,
+              MAC Serial, MAC Ethernet, Windows License, Headset S/N, Screen S/N
             </code>
           </div>
 
           {/* Tabs */}
-          <div style={styles.tabContainer}>
-            <button
-              onClick={() => setActiveTab('paste')}
-              style={{ ...styles.tabButton, borderBottom: activeTab === 'paste' ? '2px solid var(--accent-primary)' : 'none', color: activeTab === 'paste' ? 'var(--text-primary)' : 'var(--text-muted)' }}
-            >
-              <FileText size={16} />
-              <span>Paste CSV text</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('upload')}
-              style={{ ...styles.tabButton, borderBottom: activeTab === 'upload' ? '2px solid var(--accent-primary)' : 'none', color: activeTab === 'upload' ? 'var(--text-primary)' : 'var(--text-muted)' }}
-            >
-              <Upload size={16} />
-              <span>Upload CSV File</span>
-            </button>
+          <div style={s.tabs}>
+            {[
+              { id: 'paste',  icon: <FileText size={15} />, label: 'Paste CSV' },
+              { id: 'upload', icon: <Upload   size={15} />, label: 'Upload File' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                style={{ ...s.tabBtn, ...(activeTab === tab.id ? s.tabBtnActive : {}) }}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
           </div>
 
           {activeTab === 'paste' ? (
-            <div className="form-group">
-              <textarea
-                value={pasteText}
-                onChange={handleTextChange}
-                placeholder="Paste your CSV rows here...&#10;Example:&#10;Yousef Ashraf, Developer, yousef@gmail.com, yousef.ashraf@konecta.com, 01020304050, 2026-06-23, Manager Name"
-                style={styles.textarea}
-                rows={6}
-              />
-            </div>
+            <textarea
+              value={pasteText}
+              onChange={handlePasteChange}
+              placeholder={
+                'Paste CSV rows here (skip the header row)...\n\nExample:\n' +
+                'John Doe, Developer, john@gmail.com, john.doe@konecta.com, 01012345678, 2026-06-23, Manager, ThinkPad E14, 12th, i5, 16GB, 512GB SSD, LP-SN-001, Lenovo, , , WIN-LIC-001, HS-SN-001,'
+              }
+              style={s.textarea}
+              rows={6}
+            />
           ) : (
-            <div style={styles.dragDropBox}>
-              <Upload size={32} className="text-muted mb-2" />
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Select or drag a CSV file to parse</p>
+            <div style={s.dropZone} onClick={() => fileInputRef.current?.click()}>
+              <Upload size={28} style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }} />
+              <p style={{ margin: '0 0 0.25rem', fontSize: '0.875rem' }}>Click to select a CSV file</p>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Supports .csv and .txt files
+              </p>
               <input
-                type="file"
-                accept=".csv,.txt"
+                ref={fileInputRef}
+                type="file" accept=".csv,.txt"
                 onChange={handleFileUpload}
-                style={{ fontSize: '0.85rem' }}
+                style={{ display: 'none' }}
               />
             </div>
           )}
 
-          {/* Preview Table */}
-          {parsedEmployees.length > 0 && (
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-                  Parsed Employees Preview ({parsedEmployees.length})
-                </h3>
-                <span className="text-muted" style={{ fontSize: '0.75rem' }}>
-                  {parsedEmployees.filter(e => e.errors.length > 0).length} errors found
+          {/* Stats bar */}
+          {parsedRows.length > 0 && (
+            <div style={s.statsBar}>
+              <span className="badge badge-info"   style={{ fontSize: '0.75rem' }}>
+                {parsedRows.length} Employees
+              </span>
+              <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
+                {totalDevices} Devices
+              </span>
+              {totalErrors > 0 && (
+                <span className="badge badge-danger" style={{ fontSize: '0.75rem' }}>
+                  {totalErrors} Errors
                 </span>
-              </div>
+              )}
+            </div>
+          )}
 
-              <div className="table-responsive" style={styles.tableWrapper}>
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left border-b border-white/10" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Title</th>
-                      <th className="p-2">Emails</th>
-                      <th className="p-2">Contact</th>
-                      <th className="p-2">Reporting To</th>
-                      <th className="p-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedEmployees.map((emp, index) => (
-                      <tr key={index} className="border-b border-white/5" style={{ fontSize: '0.85rem', background: emp.errors.length > 0 ? 'rgba(239,68,68,0.03)' : 'none' }}>
-                        <td className="p-2 font-semibold" style={{ color: emp.errors.length > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>{emp.fullName || '—'}</td>
-                        <td className="p-2">{emp.jobTitle || '—'}</td>
-                        <td className="p-2">
-                          <div style={{ fontSize: '0.75rem' }}>P: {emp.personalEmail || '—'}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>K: {emp.konectaMail || '—'}</div>
+          {/* Preview table */}
+          {parsedRows.length > 0 && (
+            <div style={s.tableWrapper}>
+              <table className="w-full" style={{ fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,0,0,0.25)', position: 'sticky', top: 0 }}>
+                    <th style={s.th}>#</th>
+                    <th style={s.th}>Name</th>
+                    <th style={s.th}>Job Title</th>
+                    <th style={s.th}>Personal Email</th>
+                    <th style={s.th}>Konecta Mail</th>
+                    <th style={s.th}>Contact</th>
+                    <th style={s.th}>Hiring Date</th>
+                    <th style={s.th}>Laptop</th>
+                    <th style={s.th}>Specs</th>
+                    <th style={s.th}>Laptop S/N</th>
+                    <th style={s.th}>MAC S/N</th>
+                    <th style={s.th}>Win License</th>
+                    <th style={s.th}>Headset</th>
+                    <th style={s.th}>Screen</th>
+                    <th style={s.th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsedRows.map((row, idx) => {
+                    const hasErr = row._errors.length > 0;
+                    return (
+                      <tr key={idx} style={{ background: hasErr ? 'rgba(239,68,68,0.05)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={s.td}>{idx + 1}</td>
+                        <td style={{ ...s.td, fontWeight: 600, color: hasErr ? '#f87171' : 'var(--text-primary)' }}>
+                          {row.fullName || '—'}
                         </td>
-                        <td className="p-2">{emp.contactNo || '—'}</td>
-                        <td className="p-2">{emp.reportingTo || '—'}</td>
-                        <td className="p-2">
-                          {emp.errors.length > 0 ? (
-                            <span className="text-danger" style={{ fontSize: '0.75rem', display: 'block' }}>
-                              {emp.errors.join(', ')}
+                        <td style={s.td}>{row.jobTitle || '—'}</td>
+                        <td style={s.td}>{row.personalEmail || '—'}</td>
+                        <td style={s.td}>{row.konectaMail || '—'}</td>
+                        <td style={s.td}>{row.contactNo || '—'}</td>
+                        <td style={s.td}>{row.hiringDate || '—'}</td>
+                        <td style={s.td}>
+                          {row.laptopBrand ? `${row.laptopBrand} ` : ''}
+                          {row.laptopModel || '—'}
+                        </td>
+                        <td style={{ ...s.td, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {[row.laptopGen, row.processorCore, row.ram, row.harddisk].filter(Boolean).join(' / ') || '—'}
+                        </td>
+                        <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.laptopSerial || '—'}</td>
+                        <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.macSerial || '—'}</td>
+                        <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.windowsLicense || '—'}</td>
+                        <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.headsetSerial || '—'}</td>
+                        <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.screenSerial || '—'}</td>
+                        <td style={s.td}>
+                          {hasErr ? (
+                            <span style={{ color: '#f87171', fontSize: '0.7rem' }}>
+                              {row._errors.join(', ')}
                             </span>
                           ) : (
-                            <span className="text-success" style={{ fontSize: '0.75rem' }}>Ready</span>
+                            <span style={{ color: '#34d399', fontSize: '0.7rem' }}>✓ Ready</span>
                           )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
+
         </div>
 
+        {/* Footer */}
         <div className="modal-footer">
-          <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
+          <button onClick={onClose} className="btn btn-secondary">Cancel</button>
+          {parsedRows.length > 0 && (
+            <button
+              onClick={() => { setParsedRows([]); setPasteText(''); setError(''); }}
+              className="btn btn-secondary"
+              style={{ gap: '0.35rem' }}
+            >
+              <RefreshCw size={15} /> Clear
+            </button>
+          )}
           <button
-            type="button"
             className="btn btn-primary"
             onClick={handleImport}
-            disabled={loading || parsedEmployees.length === 0}
+            disabled={!canImport}
           >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              `Import ${parsedEmployees.length} Employees`
-            )}
+            {loading
+              ? <><Loader2 size={16} className="animate-spin" /> Importing…</>
+              : `Import ${parsedRows.length} Employees + ${totalDevices} Devices`
+            }
           </button>
         </div>
       </div>
@@ -290,72 +415,72 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
   );
 }
 
-const styles = {
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = {
   header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
     padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)',
-    background: 'rgba(15, 23, 42, 0.4)',
+    background: 'rgba(15,23,42,0.4)'
   },
-  instructions: {
+  alert: (type) => ({
+    display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+    padding: '0.75rem 1rem', borderRadius: '6px', fontSize: '0.85rem',
+    background: type === 'danger' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+    border: `1px solid ${type === 'danger' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+    color: type === 'danger' ? '#f87171' : '#34d399'
+  }),
+  guide: {
     padding: '0.75rem 1rem',
-    background: 'rgba(255, 255, 255, 0.02)',
+    background: 'rgba(255,255,255,0.02)',
     border: '1px solid var(--border-color)',
-    borderRadius: '6px',
-    fontSize: '0.8rem',
-    color: 'var(--text-secondary)',
-    lineHeight: 1.5
+    borderRadius: '6px', lineHeight: 1.6
   },
-  codeBlock: {
-    display: 'block',
-    marginTop: '0.25rem',
-    fontFamily: 'monospace',
-    color: 'var(--accent-primary)',
-    fontSize: '0.75rem'
+  code: {
+    display: 'block', marginTop: '0.35rem',
+    fontFamily: 'monospace', fontSize: '0.72rem',
+    color: 'var(--accent-primary)', wordBreak: 'break-all'
   },
-  tabContainer: {
-    display: 'flex',
-    borderBottom: '1px solid var(--border-color)',
-    gap: '1.5rem'
+  dlBtn: {
+    display: 'flex', alignItems: 'center', gap: '0.35rem',
+    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+    borderRadius: '6px', padding: '0.3rem 0.75rem',
+    color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.78rem'
   },
-  tabButton: {
-    background: 'none',
-    border: 'none',
-    padding: '0.5rem 0.25rem',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    fontSize: '0.85rem',
-    fontWeight: 500,
-    transition: 'all 0.2s'
+  tabs: { display: 'flex', gap: '0.5rem' },
+  tabBtn: {
+    display: 'flex', alignItems: 'center', gap: '0.35rem',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
+    borderRadius: '6px', padding: '0.4rem 0.85rem',
+    color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 500
+  },
+  tabBtnActive: {
+    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)',
+    color: 'var(--text-primary)'
   },
   textarea: {
-    width: '100%',
-    fontFamily: 'monospace',
-    fontSize: '0.8rem',
-    background: 'rgba(15, 23, 42, 0.4)',
-    border: '1px solid var(--border-color)',
-    borderRadius: '6px',
-    padding: '0.75rem',
-    color: 'var(--text-primary)',
-    resize: 'vertical'
+    width: '100%', fontFamily: 'monospace', fontSize: '0.78rem',
+    background: 'rgba(15,23,42,0.5)', border: '1px solid var(--border-color)',
+    borderRadius: '6px', padding: '0.75rem', color: 'var(--text-primary)',
+    resize: 'vertical', lineHeight: 1.5
   },
-  dragDropBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '2rem',
-    background: 'rgba(255, 255, 255, 0.01)',
-    border: '2px dashed var(--border-color)',
-    borderRadius: '8px',
-    textAlign: 'center'
+  dropZone: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    padding: '2rem', border: '2px dashed var(--border-color)', borderRadius: '8px',
+    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s'
   },
+  statsBar: { display: 'flex', gap: '0.5rem', alignItems: 'center' },
   tableWrapper: {
-    maxHeight: '220px',
-    overflowY: 'auto',
-    border: '1px solid var(--border-color)',
-    borderRadius: '6px',
-    background: 'rgba(15, 23, 42, 0.2)'
+    maxHeight: '260px', overflowY: 'auto', overflowX: 'auto',
+    border: '1px solid var(--border-color)', borderRadius: '6px',
+    background: 'rgba(15,23,42,0.2)'
+  },
+  th: {
+    padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600,
+    color: 'var(--text-muted)', whiteSpace: 'nowrap',
+    borderBottom: '1px solid rgba(255,255,255,0.06)'
+  },
+  td: {
+    padding: '0.45rem 0.75rem', color: 'var(--text-secondary)',
+    whiteSpace: 'nowrap', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis'
   }
 };
