@@ -69,16 +69,16 @@ function rowFromCols(cols) {
   return obj;
 }
 
-// Validate a parsed row
+// Validate a parsed row — returns warnings (non-blocking)
 function validateRow(row) {
-  const errors = [];
-  if (!row.fullName)       errors.push('Name required');
-  if (!row.jobTitle)       errors.push('Job Title required');
+  const warnings = [];
+  if (!row.fullName)       warnings.push('Name missing');
+  if (!row.jobTitle)       warnings.push('Job Title missing');
   if (!row.personalEmail || !row.personalEmail.includes('@'))
-                           errors.push('Valid Personal Email required');
+                           warnings.push('Personal Email invalid/missing');
   if (!row.konectaMail   || !row.konectaMail.includes('@'))
-                           errors.push('Valid Konecta Email required');
-  return errors;
+                           warnings.push('Konecta Email invalid/missing');
+  return warnings;
 }
 
 // Count how many devices a row has
@@ -117,8 +117,8 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
       // Skip header if detected on first row
       if (i === 0 && isHeaderRow(cols)) continue;
 
-      const row    = rowFromCols(cols);
-      row._errors  = validateRow(row);
+      const row        = rowFromCols(cols);
+      row._warnings    = validateRow(row);
       result.push(row);
     }
 
@@ -164,16 +164,11 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleImport = async () => {
     if (parsedRows.length === 0) return;
-    const hasErrors = parsedRows.some(r => r._errors.length > 0);
-    if (hasErrors) {
-      setError('Please fix all validation errors before importing.');
-      return;
-    }
-
+    // Warnings are non-blocking — always allow import
     setLoading(true); setError(''); setConflicts([]);
 
-    // Strip internal _errors key before sending
-    const cleanRows = parsedRows.map(({ _errors, ...rest }) => rest);
+    // Strip internal _warnings key before sending
+    const cleanRows = parsedRows.map(({ _warnings, ...rest }) => rest);
 
     try {
       const res  = await fetch('/api/users/bulk-with-assets', {
@@ -197,9 +192,9 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
     }
   };
 
-  const totalErrors   = parsedRows.filter(r => r._errors.length > 0).length;
+  const totalWarnings = parsedRows.filter(r => r._warnings.length > 0).length;
   const totalDevices  = parsedRows.reduce((s, r) => s + countDevices(r), 0);
-  const canImport     = parsedRows.length > 0 && totalErrors === 0 && !loading;
+  const canImport     = parsedRows.length > 0 && !loading;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -311,9 +306,9 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
               <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
                 {totalDevices} Devices
               </span>
-              {totalErrors > 0 && (
-                <span className="badge badge-danger" style={{ fontSize: '0.75rem' }}>
-                  {totalErrors} Errors
+              {totalWarnings > 0 && (
+                <span className="badge badge-warning" style={{ fontSize: '0.75rem', background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}>
+                  ⚠ {totalWarnings} with warnings (will still import)
                 </span>
               )}
             </div>
@@ -344,11 +339,11 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
                 </thead>
                 <tbody>
                   {parsedRows.map((row, idx) => {
-                    const hasErr = row._errors.length > 0;
+                    const hasWarn = row._warnings.length > 0;
                     return (
-                      <tr key={idx} style={{ background: hasErr ? 'rgba(239,68,68,0.05)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <tr key={idx} style={{ background: hasWarn ? 'rgba(245,158,11,0.04)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <td style={s.td}>{idx + 1}</td>
-                        <td style={{ ...s.td, fontWeight: 600, color: hasErr ? '#f87171' : 'var(--text-primary)' }}>
+                        <td style={{ ...s.td, fontWeight: 600, color: hasWarn ? '#fbbf24' : 'var(--text-primary)' }}>
                           {row.fullName || '—'}
                         </td>
                         <td style={s.td}>{row.jobTitle || '—'}</td>
@@ -369,9 +364,9 @@ export default function BulkAddEmployeesModal({ departmentId, onClose, onUpdate 
                         <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.headsetSerial || '—'}</td>
                         <td style={{ ...s.td, fontFamily: 'monospace' }}>{row.screenSerial || '—'}</td>
                         <td style={s.td}>
-                          {hasErr ? (
-                            <span style={{ color: '#f87171', fontSize: '0.7rem' }}>
-                              {row._errors.join(', ')}
+                          {hasWarn ? (
+                            <span style={{ color: '#fbbf24', fontSize: '0.7rem' }}>
+                              ⚠ {row._warnings.join(', ')}
                             </span>
                           ) : (
                             <span style={{ color: '#34d399', fontSize: '0.7rem' }}>✓ Ready</span>
