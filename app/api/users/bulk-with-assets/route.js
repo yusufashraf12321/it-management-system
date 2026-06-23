@@ -173,6 +173,20 @@ export async function POST(request) {
   }
 }
 
+// Helper to extract brand from model name (e.g., Lenovo, HP, Dell, Apple)
+function getBrandFromModel(modelText, fallback = 'Unknown') {
+  if (!modelText) return fallback;
+  const lower = modelText.toLowerCase();
+  if (lower.includes('lenovo')) return 'Lenovo';
+  if (lower.includes('hp')) return 'HP';
+  if (lower.includes('dell')) return 'Dell';
+  if (lower.includes('apple') || lower.includes('mac')) return 'Apple';
+  if (lower.includes('asus')) return 'Asus';
+  if (lower.includes('acer')) return 'Acer';
+  if (lower.includes('microsoft') || lower.includes('surface')) return 'Microsoft';
+  return fallback;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: extract device entries from a row object
 // Only devices with a non-empty serialNumber are included
@@ -189,10 +203,13 @@ function buildDeviceList(row) {
       row.harddisk      ? `${row.harddisk} HDD/SSD`   : null
     ].filter(Boolean);
 
+    // Extract brand from laptop model or default to Lenovo
+    const detectedBrand = getBrandFromModel(row.laptopModel, 'Lenovo');
+
     devices.push({
       category:     'Laptop',
-      brand:        row.laptopBrand?.trim()  || 'Unknown',
-      model:        row.laptopModel?.trim()  || 'Unknown',
+      brand:        detectedBrand,
+      model:        row.laptopModel?.trim()  || 'Unknown Laptop',
       serialNumber: row.laptopSerial.trim(),
       notes:        specsParts.length ? specsParts.join(' | ') : null
     });
@@ -224,9 +241,10 @@ function buildDeviceList(row) {
 
   // Headset
   if (row.headsetSerial?.trim()) {
+    const headsetBrand = getBrandFromModel(row.headsetBrand, 'Jabra'); // Default fallback Jabra
     devices.push({
       category:     'Headset',
-      brand:        row.headsetBrand?.trim() || 'Unknown',
+      brand:        headsetBrand,
       model:        row.headsetModel?.trim() || 'Headset',
       serialNumber: row.headsetSerial.trim(),
       notes:        null
@@ -235,9 +253,10 @@ function buildDeviceList(row) {
 
   // Screen / Monitor
   if (row.screenSerial?.trim()) {
+    const screenBrand = getBrandFromModel(row.screenModel, 'Dell'); // Default fallback Dell
     devices.push({
       category:     'Monitor',
-      brand:        row.screenBrand?.trim() || 'Unknown',
+      brand:        screenBrand,
       model:        row.screenModel?.trim() || 'Monitor',
       serialNumber: row.screenSerial.trim(),
       notes:        null

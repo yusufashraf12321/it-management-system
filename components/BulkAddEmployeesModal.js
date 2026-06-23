@@ -30,8 +30,13 @@ const COLUMNS = [
   { key: 'screenSerial',   label: 'Screen S/N',           required: false },
 ];
 
-// Parse a single CSV line (handles quoted values with commas)
+// Parse a single CSV line (handles tab-separated from Excel/Sheets or comma-separated)
 function parseCSVLine(line) {
+  // If line contains tabs, it is tab-separated (TSV)
+  if (line.includes('\t')) {
+    return line.split('\t').map(s => s.trim());
+  }
+
   const result = [];
   let current = '';
   let inQuotes = false;
