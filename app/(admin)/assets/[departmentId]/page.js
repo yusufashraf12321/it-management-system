@@ -8,6 +8,8 @@ import AddEmployeeModal from '@/components/AddEmployeeModal';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
 import ResignEmployeeModal from '@/components/ResignEmployeeModal';
+import BulkAddEmployeesModal from '@/components/BulkAddEmployeesModal';
+
 
 export default function DepartmentAssets() {
   const params = useParams();
@@ -21,6 +23,7 @@ export default function DepartmentAssets() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [printingUser, setPrintingUser] = useState(null);
   const [resigningUser, setResigningUser] = useState(null);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
   useEffect(() => {
     fetchDepartmentData();
@@ -115,10 +118,16 @@ export default function DepartmentAssets() {
             Asset tracking and employee custody management
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsAddEmployeeModalOpen(true)}>
-          <Plus size={18} />
-          <span>Add Employee</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button className="btn btn-secondary" onClick={() => setIsBulkUploadModalOpen(true)}>
+            <Plus size={18} />
+            <span>Bulk Upload</span>
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAddEmployeeModalOpen(true)}>
+            <Plus size={18} />
+            <span>Add Employee</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats & Search Panel */}
@@ -240,6 +249,14 @@ export default function DepartmentAssets() {
         <ResignEmployeeModal
           user={resigningUser}
           onClose={() => setResigningUser(null)}
+          onUpdate={fetchDepartmentData}
+        />
+      )}
+
+      {isBulkUploadModalOpen && (
+        <BulkAddEmployeesModal
+          departmentId={params.departmentId}
+          onClose={() => setIsBulkUploadModalOpen(false)}
           onUpdate={fetchDepartmentData}
         />
       )}
