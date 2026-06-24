@@ -187,7 +187,6 @@ function getBrandFromModel(modelText, fallback = 'Unknown') {
   return fallback;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Helper: extract device entries from a row object
 // Only devices with a non-empty serialNumber are included
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,42 +195,32 @@ function buildDeviceList(row) {
 
   // Laptop
   if (row.laptopSerial?.trim()) {
-    const specsParts = [
-      row.laptopGen     ? `Gen ${row.laptopGen}`       : null,
-      row.processorCore ? `${row.processorCore} Core`  : null,
-      row.ram           ? `${row.ram} RAM`             : null,
-      row.harddisk      ? `${row.harddisk} HDD/SSD`   : null
-    ].filter(Boolean);
-
-    // Extract brand from laptop model or default to Lenovo
     const detectedBrand = getBrandFromModel(row.laptopModel, 'Lenovo');
+    
+    // Create specs object to match the LAPTOPS category fields
+    const specsObj = {
+      "Gen": row.laptopGen?.trim() || "",
+      "Processor Core": row.processorCore?.trim() || "",
+      "RAM": row.ram?.trim() || "",
+      "Harddisk": row.harddisk?.trim() || "",
+      "MAC Wifi": row.macSerial?.trim() || "", // MAC Wifi mapped from row.macSerial
+      "MAC Ethernet": row.macEthernet?.trim() || "",
+      "Hostname": ""
+    };
 
     devices.push({
-      category:     'Laptop',
+      category:     'LAPTOPS',
       brand:        detectedBrand,
-      model:        row.laptopModel?.trim()  || 'Unknown Laptop',
+      model:        row.laptopModel?.trim() || 'Unknown Laptop',
       serialNumber: row.laptopSerial.trim(),
-      notes:        specsParts.length ? specsParts.join(' | ') : null
-    });
-  }
-
-  // MAC / Desktop
-  if (row.macSerial?.trim()) {
-    devices.push({
-      category:     'Desktop',
-      brand:        'Apple',
-      model:        'Mac',
-      serialNumber: row.macSerial.trim(),
-      notes:        row.macEthernet?.trim()
-                      ? `Ethernet SN: ${row.macEthernet.trim()}`
-                      : null
+      notes:        JSON.stringify(specsObj)
     });
   }
 
   // Windows License
   if (row.windowsLicense?.trim()) {
     devices.push({
-      category:     'Software License',
+      category:     'SOFTWARE_LICENSE',
       brand:        'Microsoft',
       model:        'Windows',
       serialNumber: row.windowsLicense.trim(),
@@ -241,9 +230,9 @@ function buildDeviceList(row) {
 
   // Headset
   if (row.headsetSerial?.trim()) {
-    const headsetBrand = getBrandFromModel(row.headsetBrand, 'Jabra'); // Default fallback Jabra
+    const headsetBrand = getBrandFromModel(row.headsetBrand, 'Jabra');
     devices.push({
-      category:     'Headset',
+      category:     'HEADSETS',
       brand:        headsetBrand,
       model:        row.headsetModel?.trim() || 'Headset',
       serialNumber: row.headsetSerial.trim(),
@@ -253,11 +242,11 @@ function buildDeviceList(row) {
 
   // Screen / Monitor
   if (row.screenSerial?.trim()) {
-    const screenBrand = getBrandFromModel(row.screenModel, 'Dell'); // Default fallback Dell
+    const screenBrand = getBrandFromModel(row.screenModel, 'Dell');
     devices.push({
-      category:     'Monitor',
+      category:     'SCREENS',
       brand:        screenBrand,
-      model:        row.screenModel?.trim() || 'Monitor',
+      model:        row.screenModel?.trim() || 'Screen',
       serialNumber: row.screenSerial.trim(),
       notes:        null
     });

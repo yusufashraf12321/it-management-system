@@ -104,6 +104,29 @@ export default function CategoryDetail() {
     show: { y: 0, opacity: 1 }
   };
 
+  const renderSpecs = (notes) => {
+    if (!notes) return null;
+    try {
+      const parsed = JSON.parse(notes);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {Object.entries(parsed).map(([key, val]) => (
+              val ? (
+                <span key={key} className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-muted">
+                  <strong>{key}:</strong> {val}
+                </span>
+              ) : null
+            ))}
+          </div>
+        );
+      }
+    } catch (e) {
+      // Standard text notes
+    }
+    return <p className="text-xs text-muted mt-2 italic">{notes}</p>;
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
@@ -221,6 +244,7 @@ export default function CategoryDetail() {
                             <ShieldCheck size={16} className="text-accent-primary/30 group-hover:text-accent-primary transition-colors" />
                             {asset.serialNumber}
                           </div>
+                          {renderSpecs(asset.notes)}
                         </td>
                         <td className="p-6">
                           <span className="font-mono text-sm font-bold text-success">
@@ -292,6 +316,7 @@ export default function CategoryDetail() {
         {selectedAssetForEdit && (
           <EditAssetModal 
             asset={selectedAssetForEdit} 
+            category={data.category}
             onClose={() => setSelectedAssetForEdit(null)} 
             onUpdate={fetchData} 
           />

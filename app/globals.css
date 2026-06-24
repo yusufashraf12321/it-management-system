@@ -117,7 +117,7 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
   animation: modalEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  overflow: clip; /* preserves border-radius but allows inner scroll */
   z-index: 100000;
 }
 
@@ -150,6 +150,16 @@ body {
   padding: 1.5rem;
   overflow-y: auto;
   flex: 1;
+  min-height: 0; /* critical: allows flex child to shrink and scroll */
+}
+
+/* form inside modals must also participate in flex layout */
+.modal-container form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .modal-footer {

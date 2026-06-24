@@ -1,17 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 
 export default function AddCategoryModal({ onClose, onUpdate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [formData, setFormData] = useState({
-    name: ''
-  });
+  const [name, setName] = useState('');
+  const [fields, setFields] = useState([]);
+  const [newField, setNewField] = useState('');
+
+  const handleAddField = () => {
+    const trimmed = newField.trim();
+    if (trimmed && !fields.includes(trimmed)) {
+      setFields([...fields, trimmed]);
+      setNewField('');
+    }
+  };
+
+  const handleRemoveField = (fieldToRemove) => {
+    setFields(fields.filter(f => f !== fieldToRemove));
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!name.trim()) return;
+    
     setLoading(true);
     setError('');
     
@@ -19,7 +33,10 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
       const res = await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          name: name.trim(),
+          fields
+        })
       });
       
       if (res.ok) {
@@ -54,16 +71,59 @@ export default function AddCategoryModal({ onClose, onUpdate }) {
               <label>Category Name</label>
               <input 
                 type="text" 
-                value={formData.name}
-                onChange={(e) => setFormData({ name: e.target.value })}
-                placeholder="e.g. LAPTOPS, MONITORS..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. LAPTOPS, HEADSETS, SCREENS, TV..."
                 required 
                 autoFocus
               />
             </div>
-            <p className="text-muted text-sm mt-4">
-              After creating the category, you can add specific brands and models from the category detail page.
-            </p>
+
+            <div className="form-group mt-6">
+              <label className="mb-2 block">Custom Tracking Fields (Optional)</label>
+              <p className="text-muted text-xs mb-3">Define the details that will be tracked and filled in for every device under this category.</p>
+              
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={newField}
+                  onChange={(e) => setNewField(e.target.value)}
+                  placeholder="e.g. Gen, Processor, RAM, Wifi MAC..."
+                  style={{ flex: 1 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddField();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleAddField}
+                  style={{ padding: '0 1.25rem', height: '44px' }}
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
+
+              {fields.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {fields.map((field, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', background: 'rgba(255,255,255,0.05)', padding: '0.375rem 0.75rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                      <span>{field}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveField(field)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, color: 'var(--danger)' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="modal-footer">

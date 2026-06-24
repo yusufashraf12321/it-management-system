@@ -62,6 +62,27 @@ async function main() {
     });
   }
 
+  // 3. Create Default Inventory Categories
+  console.log('📦 Creating Default Inventory Categories...');
+  const defaultCategories = [
+    {
+      name: 'LAPTOPS',
+      fields: JSON.stringify(['Gen', 'Processor Core', 'RAM', 'Harddisk', 'MAC Wifi', 'MAC Ethernet', 'Hostname'])
+    },
+    { name: 'HEADSETS',         fields: JSON.stringify([]) },
+    { name: 'SCREENS',          fields: JSON.stringify([]) },
+    { name: 'TV',               fields: JSON.stringify([]) },
+    { name: 'SOFTWARE_LICENSE', fields: JSON.stringify([]) },
+  ];
+
+  for (const cat of defaultCategories) {
+    await prisma.category.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: cat
+    });
+  }
+
   console.log('✅ Database Initialization Complete!');
   console.log('--------------------------------------------------');
   console.log('🔑 NEW ADMIN ACCOUNTS CREATED:');

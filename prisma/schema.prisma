@@ -178,6 +178,7 @@ model Maintenance {
 }
 
 model Category {
-  id   Int    @id @default(autoincrement())
-  name String @unique
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  fields String? // JSON array of custom field names
 }

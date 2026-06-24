@@ -1,16 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 
-export default function EditAssetModal({ asset, onClose, onUpdate }) {
+export default function EditAssetModal({ asset, category, onClose, onUpdate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fields, setFields] = useState([]);
+  const [specs, setSpecs] = useState({});
+
   const [formData, setFormData] = useState({
     serialNumber: asset.serialNumber,
     status: asset.status,
     notes: asset.notes || ''
   });
+
+  useEffect(() => {
+    const fetchCategoryFields = async () => {
+      try {
+        const res = await fetch('/api/categories');
+        const categories = await res.json();
+        const match = categories.find(c => c.name.toLowerCase() === category?.toLowerCase());
+        if (match && match.fields) {
+          setFields(match.fields);
+          
+          let existingSpecs = {};
+          try {
+            const parsed = JSON.parse(asset.notes);
+            if (typeof parsed === 'object' && parsed !== null) {
+              existingSpecs = parsed;
+            }
+          } catch (e) {
+            // notes is plain text
+          }
+          
+          const specsObj = {};
+          match.fields.forEach(f => {
+            specsObj[f] = existingSpecs[f] || '';
+          });
+          setSpecs(specsObj);
+        }
+      } catch (e) {
+        console.error('Error fetching category fields:', e);
+      }
+    };
+    if (category) {
+      fetchCategoryFields();
+    }
+  }, [category, asset]);
+
+  const handleSpecChange = (field, value) => {
+    setSpecs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -18,10 +62,16 @@ export default function EditAssetModal({ asset, onClose, onUpdate }) {
     setError('');
     
     try {
+      const payload = {
+        serialNumber: formData.serialNumber,
+        status: formData.status,
+        notes: fields.length > 0 ? JSON.stringify(specs) : formData.notes
+      };
+
       const res = await fetch(`/api/assets/${asset.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       
       if (res.ok) {
@@ -77,15 +127,34 @@ export default function EditAssetModal({ asset, onClose, onUpdate }) {
               {asset.status === 'ASSIGNED' && <p className="text-muted text-xs mt-1">Cannot change status while assigned.</p>}
             </div>
 
-            <div className="form-group">
-              <label>Notes / Condition</label>
-              <textarea 
-                value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                rows={3}
-                placeholder="Add details about the device condition..."
-              />
-            </div>
+            {fields.length > 0 ? (
+              <div className="mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/5 animate-fade-in">
+                <h4 className="text-xs uppercase font-bold tracking-wider text-accent-primary mb-3">Specifications</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {fields.map((field) => (
+                    <div key={field} className="form-group">
+                      <label>{field}</label>
+                      <input
+                        type="text"
+                        value={specs[field] || ''}
+                        onChange={(e) => handleSpecChange(field, e.target.value)}
+                        placeholder={`Enter ${field}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label>Notes / Condition</label>
+                <textarea 
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  rows={3}
+                  placeholder="Add details about the device condition..."
+                />
+              </div>
+            )}
           </div>
 
           <div className="modal-footer">

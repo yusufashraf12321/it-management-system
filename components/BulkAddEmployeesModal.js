@@ -30,8 +30,12 @@ const COLUMNS = [
   { key: 'screenSerial',   label: 'Screen S/N',           required: false },
 ];
 
-// Parse a single CSV line (handles quoted values with commas)
+// Parse a single CSV line (handles quoted values with commas and tabs)
 function parseCSVLine(line) {
+  // Auto-detect delimiter: if line contains tabs, prioritize tab over comma.
+  // This helps when pasting from Excel.
+  const delimiter = line.includes('\t') ? '\t' : ',';
+  
   const result = [];
   let current = '';
   let inQuotes = false;
@@ -39,7 +43,7 @@ function parseCSVLine(line) {
     const ch = line[i];
     if (ch === '"') {
       inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
+    } else if (ch === delimiter && !inQuotes) {
       result.push(current.trim());
       current = '';
     } else {

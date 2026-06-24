@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { category, brand, model, serialNumbers, status = 'IN_STOCK', vendorName = 'Internal' } = data;
+    const { category, brand, model, serialNumbers, status = 'IN_STOCK', vendorName = 'Internal', specs = null } = data;
 
     if (!category || !brand || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -35,7 +35,8 @@ export async function POST(request) {
             data: {
               serialNumber: serial,
               inventoryItemId: inventoryItem.id,
-              status: status // Can be IN_STOCK or MAINTENANCE
+              status: status, // Can be IN_STOCK or MAINTENANCE
+              notes: specs ? JSON.stringify(specs) : null
             }
           });
 

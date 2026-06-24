@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, Loader2, List, FileText } from 'lucide-react';
 
 export default function AddItemToCategoryModal({ category, onClose, onUpdate }) {
@@ -8,6 +8,7 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [addMode, setAddMode] = useState('single'); // 'single' or 'bulk'
+  const [fields, setFields] = useState([]);
   
   const [formData, setFormData] = useState({
     brand: '',
@@ -15,12 +16,47 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
     serialNumber: '',
     bulkSerials: '',
     status: 'IN_STOCK',
-    vendorName: ''
+    vendorName: '',
+    specs: {}
   });
+
+  useEffect(() => {
+    const fetchCategoryFields = async () => {
+      try {
+        const res = await fetch('/api/categories');
+        const categories = await res.json();
+        const match = categories.find(c => c.name.toLowerCase() === category.toLowerCase());
+        if (match && match.fields) {
+          setFields(match.fields);
+          const initialSpecs = {};
+          match.fields.forEach(f => {
+            initialSpecs[f] = '';
+          });
+          setFormData(prev => ({
+            ...prev,
+            specs: initialSpecs
+          }));
+        }
+      } catch (e) {
+        console.error('Error fetching category fields:', e);
+      }
+    };
+    fetchCategoryFields();
+  }, [category]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSpecChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      specs: {
+        ...prev.specs,
+        [field]: value
+      }
+    }));
   };
 
   const handleSave = async (e) => {
@@ -43,7 +79,8 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
           model: formData.model,
           serialNumbers: serials,
           status: formData.status,
-          vendorName: formData.vendorName
+          vendorName: formData.vendorName,
+          specs: fields.length > 0 ? formData.specs : null
         })
       });
       
@@ -94,6 +131,25 @@ export default function AddItemToCategoryModal({ category, onClose, onUpdate }) 
                 <input type="text" name="model" value={formData.model} onChange={handleChange} placeholder="e.g. Latitude 5540" required />
               </div>
             </div>
+
+            {fields.length > 0 && (
+              <div className="mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/5 animate-fade-in">
+                <h4 className="text-xs uppercase font-bold tracking-wider text-accent-primary mb-3">Specifications & Custom Info</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {fields.map((field) => (
+                    <div key={field} className="form-group">
+                      <label>{field}</label>
+                      <input
+                        type="text"
+                        value={formData.specs[field] || ''}
+                        onChange={(e) => handleSpecChange(field, e.target.value)}
+                        placeholder={`Enter ${field}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mb-6">
               <label className="mb-2 block">Entry Mode</label>

@@ -33,10 +33,10 @@ export async function PUT(request, { params }) {
     const item = await prisma.inventoryItem.update({
       where: { id: parseInt(params.id) },
       data: {
-        category: data.category,
-        brand: data.brand,
-        model: data.model,
-        totalCount: data.totalCount !== undefined ? parseInt(data.totalCount) : undefined,
+        category:       data.category,
+        brand:          data.brand,
+        model:          data.model,
+        totalCount:     data.totalCount     !== undefined ? parseInt(data.totalCount)     : undefined,
         availableCount: data.availableCount !== undefined ? parseInt(data.availableCount) : undefined
       }
     });
@@ -49,18 +49,31 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    // Delete all related assets first
-    await prisma.asset.deleteMany({
-      where: { inventoryItemId: parseInt(params.id) }
+    const itemId = parseInt(params.id);
+
+    // 1. Fetch all assets for this inventory item
+    const assets = await prisma.asset.findMany({
+      where: { inventoryItemId: itemId },
+      select: { id: true, status: true, assignedToUserId: true }
     });
 
-    await prisma.inventoryItem.delete({
-      where: { id: parseInt(params.id) }
-    });
+    // 2. Block deletion if any asset is ASSIGNED
+    const assignedAssets = assets.filter(a => a.status === 'ASSIGNED');
+    if (assignedAssets.length > 0) {
+      return NextResponse.json({
+        error: `Cannot delete: ${assignedAssets.length} asset(s) are currently assigned to employees. Please unassign them first.`
+      }, { status: 400 });
+    }
+
+    // 3. Safe to delete — remove all assets then the inventory item
+    await prisma.$transaction([
+      prisma.asset.deleteMany({ where: { inventoryItemId: itemId } }),
+      prisma.inventoryItem.delete({ where: { id: itemId } })
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting inventory item:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
