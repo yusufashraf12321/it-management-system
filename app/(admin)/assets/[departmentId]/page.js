@@ -25,8 +25,12 @@ export default function DepartmentAssets() {
   const [resigningUser, setResigningUser] = useState(null);
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [deletingBulk, setDeletingBulk] = useState(false);
+
   useEffect(() => {
     fetchDepartmentData();
+    setSelectedUserIds([]); // clear selection when dept changes
   }, [params.departmentId]);
 
   const fetchDepartmentData = async () => {
@@ -50,6 +54,51 @@ export default function DepartmentAssets() {
     user.fullName.toLowerCase().includes(search.toLowerCase()) ||
     user.jobTitle.toLowerCase().includes(search.toLowerCase())
   );
+
+  const toggleSelectUser = (userId) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const filteredIds = filteredUsers.map(u => u.id);
+    const allSelected = filteredIds.every(id => selectedUserIds.includes(id));
+    if (allSelected) {
+      // Deselect all filtered users
+      setSelectedUserIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      // Select all filtered users
+      setSelectedUserIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedUserIds.length} selected employees? All their custody assets will be returned to stock.`)) {
+      return;
+    }
+    setDeletingBulk(true);
+    try {
+      const res = await fetch('/api/users/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: selectedUserIds })
+      });
+      if (res.ok) {
+        setSelectedUserIds([]);
+        await fetchDepartmentData();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete users');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error during bulk deletion');
+    } finally {
+      setDeletingBulk(false);
+    }
+  };
 
   const handleUserClick = async (userId) => {
     try {
@@ -133,17 +182,39 @@ export default function DepartmentAssets() {
       {/* Stats & Search Panel */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: '300px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search employees..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: '2.5rem', width: '100%' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '300px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="Search employees..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: '2.5rem', width: '100%' }}
+              />
+            </div>
+            {filteredUsers.length > 0 && (
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
+                onClick={toggleSelectAll}
+              >
+                {filteredUsers.every(id => selectedUserIds.includes(id.id)) ? 'Deselect All' : 'Select All'}
+              </button>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {selectedUserIds.length > 0 && (
+              <button
+                className="btn btn-danger"
+                style={{ backgroundColor: 'var(--danger)', color: 'white', padding: '0.5rem 1rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                onClick={handleBulkDelete}
+                disabled={deletingBulk}
+              >
+                {deletingBulk ? <Loader2 size={14} className="animate-spin" /> : null}
+                Delete Selected ({selectedUserIds.length})
+              </button>
+            )}
             <div className="badge badge-info" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
               {users.length} Employees
             </div>
@@ -160,9 +231,24 @@ export default function DepartmentAssets() {
           <div
             key={user.id}
             className="glass-card"
-            style={styles.userCard}
+            style={{
+              ...styles.userCard,
+              border: selectedUserIds.includes(user.id) ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
+            }}
             onClick={() => handleUserClick(user.id)}
           >
+            {/* Selection Checkbox */}
+            <div
+              style={styles.checkboxContainer}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={selectedUserIds.includes(user.id)}
+                onChange={() => toggleSelectUser(user.id)}
+                style={styles.checkbox}
+              />
+            </div>
             {/* Avatar */}
             <div style={styles.avatar}>
               <User size={30} />
@@ -328,5 +414,18 @@ const styles = {
     fontSize: '0.8rem',
     color: 'var(--text-secondary)',
     border: '1px solid var(--border-color)',
+  },
+  checkboxContainer: {
+    position: 'absolute',
+    top: '0.75rem',
+    left: '0.75rem',
+    cursor: 'pointer',
+    zIndex: 10,
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    cursor: 'pointer',
+    accentColor: 'var(--accent-primary)',
   },
 };
